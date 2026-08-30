@@ -1511,7 +1511,3 @@ Las principales responsabilidades de Refund son:
 La especificación identifica los reembolsos como parte del alcance del sistema, pero no define su estructura interna ni las condiciones detalladas bajo las cuales debe ejecutarse.
 
 Por esta razón, no se agregan atributos como `amount`, `paymentMethod` o `date` hasta contar con una regla de negocio que justifique su existencia.
-
-```
-
-```
