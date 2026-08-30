@@ -159,7 +159,7 @@ Un producto puede tener cero o múltiples variantes.
 Ejemplos conceptuales:
 
 - Color = Negro
-- Talla = M
+- Talla = L
 - Modelo = Pro
 
 ### Business Rules

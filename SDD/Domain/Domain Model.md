@@ -45,55 +45,61 @@ jerarquías y relaciones principales:
 
 ```text
 User
-│
-├── Buyer
-│
-├── Seller
-│
-├── Administrator
-│
-├── LogisticsOperator
-│
-└── Supervisor
+   │
+   ├── Buyer
+   │
+   ├── Seller
+   │
+   ├── Administrator
+   │
+   ├── LogisticsOperator
+   │
+   └── Supervisor
+
 
 Product
-│
-├── PhysicalProduct
-│
-└── DigitalProduct
+   │
+   ├── PhysicalProduct
+   │
+   └── DigitalProduct
+
 
 Seller
-├── manages ──────────────> Product
-│
-└── owns ─────────────────> Warehouse
+   ├── manages ──────────────> Product
+   │
+   └── owns ─────────────────> Warehouse
+
 
 PhysicalProduct
-│
-└── has ──────────────────> Inventory
-│
-└── stored in ───────> Warehouse
+   │
+   └── has ──────────────────> Inventory
+                                  │
+                                  └── stored in ───────> Warehouse
+
 
 Buyer
-├── owns ─────────────────> Cart
-│ │
-│ └── contains ───────> CartItem
-│ │
-│ └── references ──> Product
-│
-└── creates ──────────────> Order
-│
-└── contains ───────> OrderItem
-│
-└── references ──> Product
+   ├── owns ─────────────────> Cart
+   │                              │
+   │                              └── contains ───────> CartItem
+   │                                                        │
+   │                                                        └── references ──> Product
+   │
+   └── creates ──────────────> Order
+                                  │
+                                  └── contains ───────> OrderItem
+                                                            │
+                                                            └── references ──> Product
+
 
 Order
-├── generates ────────────> Shipment
-│
-├── generates ────────────> Invoice
-│
-└── may generate ─────────> Return
-│
-└── generates ──────> Refund
+   ├── generates ────────────> Shipment
+   │
+   ├── generates ────────────> Invoice
+   │
+   └── may generate ─────────> Return
+                                  │
+                                  └── generates ──────> Refund
+
 ```
 
 ## Main Domain Flow
@@ -102,41 +108,43 @@ El flujo principal del negocio puede resumirse de la siguiente manera:
 
 ```text
 Administrator
-│
-└── registers ────────────> Seller
-│
-└── has ───────────> Warehouse
-│
-└── stores ──> Inventory
+   │
+   └── registers ────────────> Seller
+                                  │
+                                  └── has ───────────> Warehouse
+                                                         │
+                                                         └── stores ──> Inventory
+
 
 Seller
-│
-└── registers ────────────> Product
-│
-├── PhysicalProduct
-│ │
-│ └── requires ──> Inventory
-│
-└── DigitalProduct
+   │
+   └── registers ────────────> Product
+                                  │
+                                  ├── PhysicalProduct
+                                  │       │
+                                  │       └── requires ──> Inventory
+                                  │
+                                  └── DigitalProduct
+
 
 Buyer
-│
-└── selects products ─────> Cart
-│
-└── contains ───────> CartItem
-│
-└── Product
-│
-▼
-Order
-│
-┌───────────────────────┼───────────────────────┐
-│ │ │
-▼ ▼ ▼
-Invoice Shipment Return
-│
-▼
-Refund
+   │
+   └── selects products ─────> Cart
+                                  │
+                                  └── contains ───────> CartItem
+                                                         │
+                                                         └── Product
+                                                              │
+                                                              ▼
+                                                            Order
+                                                              │
+                                      ┌───────────────────────┼───────────────────────┐
+                                      │                       │                       │
+                                      ▼                       ▼                       ▼
+                                   Invoice                 Shipment                Return
+                                                                                     │
+                                                                                     ▼
+                                                                                  Refund
 ```
 
 ---
