@@ -13,7 +13,8 @@ import java.util.List;
 @NoArgsConstructor
 public abstract class Product {
 
-    private Integer productId;
+    private int productId;
     private List<Variant> variants;
     private ProductStatus status;
+    
 }

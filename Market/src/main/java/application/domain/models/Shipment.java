@@ -13,4 +13,5 @@ public class Shipment {
     private Integer shipmentId;
     private Order order;
     private Address destination;
+    
 }

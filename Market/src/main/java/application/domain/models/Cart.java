@@ -12,7 +12,8 @@ import java.util.List;
 @NoArgsConstructor
 public class Cart {
 
-    private Integer cartId;
+    private int cartId;
     private Buyer buyer;
     private List<CartItem> items = new ArrayList<>();
+    
 }
