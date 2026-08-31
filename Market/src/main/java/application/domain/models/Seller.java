@@ -9,4 +9,6 @@ import lombok.Setter;
 @NoArgsConstructor
 public class Seller extends User {
 
+    private List<Product> products;
+
 }
