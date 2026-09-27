@@ -387,72 +387,14 @@ Los vendedores son incorporados administrativamente por un `Administrator` y no 
 
 ## Attributes
 
-En el modelo actual no se identifican atributos propios adicionales para `Seller` que deban almacenarse además de los heredados de `User`. La información relacionada con los productos y bodegas se representa mediante relaciones con otras entidades del dominio.
+| Attribute    | Type              | Description                              |
+| ------------ | ----------------- | ---------------------------------------- |
+| `products`   | `List<Product>`   | Productos administrados por el vendedor. |
+| `warehouses` | `List<Warehouse>` | Bodegas asociadas al vendedor.           |
 
 ## Relationships
 
 ```text
-User
-   │
-   └── Seller
-         │
-         ├── manages ──────────> Product
-         │
-         └── owns ──────────────> Warehouse
-```
-
-Un Buyer es una especialización de User.
-
-Un comprador puede tener un carrito activo y puede realizar múltiples pedidos durante su participación en el Marketplace.
-
-### Business Rules
-
-- El comprador debe estar registrado como usuario del sistema.
-- El comprador debe tener una dirección principal.
-- Las direcciones adicionales son opcionales.
-- El comprador debe tener un estado comercial válido.
-- El comprador puede seleccionar productos mediante el carrito.
-- El comprador puede confirmar pedidos.
-- El comprador no puede administrar información de otros compradores.
-- El comprador no puede administrar inventarios.
-
-### Responsibilities
-
-Las principales responsabilidades de Buyer son:
-
-- Mantener la información específica necesaria para participar en procesos comerciales.
-- Gestionar sus direcciones de entrega.
-- Seleccionar productos mediante el carrito.
-- Confirmar pedidos.
-- Consultar la información relacionada con sus procesos de compra.
-
-### Design Notes
-
-Buyer hereda de User porque comparte la información común de todos los participantes del sistema, pero posee información y responsabilidades específicas relacionadas con la compra.
-
-La información de las direcciones no se coloca directamente en User, ya que no todos los participantes del Marketplace necesitan información de entrega.
-
----
-
-## Seller
-
-### Description
-
-Seller representa al usuario responsable de registrar y administrar los productos que comercializa dentro del Marketplace.
-
-Los vendedores son incorporados administrativamente por un Administrator y no pueden registrarse por sí mismos.
-
-El vendedor registra productos, define sus características y administra la información relacionada con sus productos.
-
-### Attributes
-
-En el modelo actual no se identifican atributos propios adicionales para Seller que deban almacenarse además de los heredados de User.
-
-La información relacionada con los productos y bodegas se representa mediante relaciones con otras entidades del dominio.
-
-### Relationships
-
-```
 User
    │
    └── Seller
@@ -489,7 +431,7 @@ Las principales responsabilidades de Seller son:
 
 No se agregan atributos como `products` o `warehouses` directamente dentro de Seller.
 
-Estas relaciones serán representadas mediante asociaciones con Product y Warehouse, evitando duplicar información y manteniendo separadas las responsabilidades de cada entidad.
+Estas relaciones serán representadas mediante asociaciones con Product y Warehouse, evitando duplicar información y manteniendo separadas las responsabilidades de cada entidad.información de entrega.
 
 ---
 
