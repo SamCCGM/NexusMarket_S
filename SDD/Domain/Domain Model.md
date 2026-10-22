@@ -25,13 +25,12 @@ El modelo distingue principalmente entre:
 - Procesos logísticos y comerciales.
 - Devoluciones y reembolsos.
 
-El sistema contempla cinco tipos de participantes principales:
+El sistema contempla cuatro tipos de participantes principales:
 
 - Buyer
 - Seller
 - LogisticsOperator
 - Administrator
-- Supervisor
 
 Cada participante tiene un único rol dentro del sistema y solamente puede
 interactuar con la información correspondiente a sus responsabilidades.
@@ -44,61 +43,57 @@ El modelo general del dominio puede representarse mediante las siguientes
 jerarquías y relaciones principales:
 
 ```text
-User
-   │
-   ├── Buyer
-   │
-   ├── Seller
-   │
-   ├── Administrator
-   │
-   ├── LogisticsOperator
-   │
-   └── Supervisor
 
+User
+   │
+   ├── Buyer
+   │
+   ├── Seller
+   │
+   ├── Administrator
+   │
+   └── LogisticsOperator
 
 Product
-   │
-   ├── PhysicalProduct
-   │
-   └── DigitalProduct
-
+   │
+   ├── PhysicalProduct
+   │
+   └── DigitalProduct
 
 Seller
-   ├── manages ──────────────> Product
-   │
-   └── owns ─────────────────> Warehouse
+   └── manages ──────────────> Product
 
+Warehouse
+   ├── type = MARKETPLACE (operación central)
+   └── type = SELLER ────────> Seller asociado
 
 PhysicalProduct
-   │
-   └── has ──────────────────> Inventory
-                                  │
-                                  └── stored in ───────> Warehouse
-
+   │
+   └── has ──────────────────> Inventory
+                                  │
+                                  └── stored in ───────> Warehouse
 
 Buyer
-   ├── owns ─────────────────> Cart
-   │                              │
-   │                              └── contains ───────> CartItem
-   │                                                        │
-   │                                                        └── references ──> Product
-   │
-   └── creates ──────────────> Order
-                                  │
-                                  └── contains ───────> OrderItem
-                                                            │
-                                                            └── references ──> Product
-
+   ├── owns ─────────────────> Cart
+   │                              │
+   │                              └── contains ───────> CartItem
+   │                                                        │
+   │                                                        └── references ──> Product
+   │
+   └── creates ──────────────> Order
+                                  │
+                                  └── contains ───────> OrderItem
+                                                            │
+                                                            └── references ──> Product
 
 Order
-   ├── generates ────────────> Shipment
-   │
-   ├── generates ────────────> Invoice
-   │
-   └── may generate ─────────> Return
-                                  │
-                                  └── generates ──────> Refund
+   ├── generates ────────────> Shipment
+   │
+   ├── generates ────────────> Invoice
+   │
+   └── may generate ─────────> Return
+                                  │
+                                  └── generates ──────> Refund
 
 ```
 
@@ -107,44 +102,42 @@ Order
 El flujo principal del negocio puede resumirse de la siguiente manera:
 
 ```text
-Administrator
-   │
-   └── registers ────────────> Seller
-                                  │
-                                  └── has ───────────> Warehouse
-                                                         │
-                                                         └── stores ──> Inventory
 
+Administrator
+   └── registers ────────────> Seller
+
+Warehouse (MARKETPLACE or SELLER)
+   └── stores ───────────────> Inventory
 
 Seller
-   │
-   └── registers ────────────> Product
-                                  │
-                                  ├── PhysicalProduct
-                                  │       │
-                                  │       └── requires ──> Inventory
-                                  │
-                                  └── DigitalProduct
-
+   │
+   └── registers ────────────> Product
+                                  │
+                                  ├── PhysicalProduct
+                                  │       │
+                                  │       └── requires ──> Inventory
+                                  │
+                                  └── DigitalProduct
 
 Buyer
-   │
-   └── selects products ─────> Cart
-                                  │
-                                  └── contains ───────> CartItem
-                                                         │
-                                                         └── Product
-                                                              │
-                                                              ▼
-                                                            Order
-                                                              │
-                                      ┌───────────────────────┼───────────────────────┐
-                                      │                       │                       │
-                                      ▼                       ▼                       ▼
-                                   Invoice                 Shipment                Return
-                                                                                     │
-                                                                                     ▼
-                                                                                  Refund
+   │
+   └── selects products ─────> Cart
+                                  │
+                                  └── contains ───────> CartItem
+                                                         │
+                                                         └── Product
+                                                              │
+                                                              ▼
+                                                            Order
+                                                              │
+                                      ┌───────────────────────┼───────────────────────┐
+                                      │                       │                       │
+                                      ▼                       ▼                       ▼
+                                   Invoice                 Shipment                Return
+                                                                                     │
+                                                                                     ▼
+                                                                                  Refund
+
 ```
 
 ---
@@ -159,19 +152,17 @@ sistema NexusMarket.
 La entidad User constituye la base para los diferentes participantes del
 Marketplace y permite representar la información común que comparten todos
 los roles del sistema.
-
 User es una clase abstracta porque representa un concepto general de usuario.
+
 Las responsabilidades específicas se encuentran en sus clases especializadas:
 
 - Buyer
 - Seller
 - Administrator
 - LogisticsOperator
-- Supervisor
 
 La clase `User` no debe ser instanciada directamente. Cada usuario debe
 pertenecer a una única especialización y tener un único rol dentro del sistema.
-
 El rol determina las responsabilidades y permisos que tiene el usuario dentro
 del Marketplace.
 
@@ -179,13 +170,13 @@ del Marketplace.
 
 ## Attributes
 
-| Attribute | Type         | Description                                                             |
-| --------- | ------------ | ----------------------------------------------------------------------- |
-| `id`      | `String`     | Identificador único del usuario dentro de la plataforma.                |
-| `name`    | `String`     | Nombre completo y oficial del usuario.                                  |
-| `email`   | `String`     | Correo electrónico utilizado como medio de acceso y comunicación.       |
-| `role`    | `UserRole`   | Define las responsabilidades y permisos del usuario dentro del sistema. |
-| `status`  | `UserStatus` | Representa la condición operativa actual del usuario.                   |
+| Attribute  | Type         | Description                                                              |
+| ---------- | ------------ | ------------------------------------------------------------------------ |
+| `id`       | `String`     | Identificador único del usuario dentro de la plataforma.                 |
+| `name`     | `String`     | Nombre completo y oficial del usuario.                                   |
+| `email`    | `String`     | Correo electrónico utilizado como medio de acceso y comunicación.        |
+| `role`     | `UserRole`   | Define las responsabilidades y permisos del usuario dentro del sistema.  |
+| `status`   | `UserStatus` | Representa la condición operativa actual del usuario.                    |
 
 ---
 
@@ -222,21 +213,18 @@ comunicación.
 ### role
 
 Define las responsabilidades y permisos asociados al usuario.
-
 Los roles definidos por NexusMarket son:
 
 - `BUYER`
 - `SELLER`
 - `LOGISTICS_OPERATOR`
 - `ADMINISTRATOR`
-- `SUPERVISOR`
 
 Cada usuario debe tener un único rol.
 
 ### status
 
 Representa la condición operativa del usuario dentro del sistema.
-
 El estado debe pertenecer al catálogo de estados definido por el sistema. Entre
 los estados contemplados se encuentra, por ejemplo, `ACTIVE` y `BLOCKED`.
 
@@ -247,17 +235,17 @@ los estados contemplados se encuentra, por ejemplo, `ACTIVE` y `BLOCKED`.
 `User` es la clase base de los diferentes participantes del Marketplace.
 
 ```text
+
 User
-   │
-   ├── Buyer
-   │
-   ├── Seller
-   │
-   ├── Administrator
-   │
-   ├── LogisticsOperator
-   │
-   └── Supervisor
+   │
+   ├── Buyer
+   │
+   ├── Seller
+   │
+   ├── Administrator
+   │
+   └── LogisticsOperator
+
 ```
 
 ---
@@ -271,7 +259,6 @@ Marketplace.
 
 Esta clase especializa a `User` y contiene la información específica necesaria
 para que un usuario pueda participar en los procesos comerciales de compra.
-
 El comprador puede seleccionar productos mediante un carrito y posteriormente
 confirmar un pedido.
 
@@ -282,11 +269,11 @@ compradores ni administrar inventarios.
 
 ## Attributes
 
-| Attribute             | Type               | Description                                                                  |
-| --------------------- | ------------------ | ---------------------------------------------------------------------------- |
-| `primaryAddress`      | `Address`          | Ubicación habitual utilizada para las entregas del comprador.                |
-| `additionalAddresses` | `List<Address>`    | Conjunto de ubicaciones secundarias que pueden utilizarse para las entregas. |
-| `commercialStatus`    | `CommercialStatus` | Condición actual del comprador para realizar compras.                        |
+| Attribute              | Type                | Description                                                                   |
+| ---------------------- | ------------------- | ----------------------------------------------------------------------------- |
+| `primaryAddress`       | `Address`           | Ubicación habitual utilizada para las entregas del comprador.                 |
+| `additionalAddresses`  | `List<Address>`     | Conjunto de ubicaciones secundarias que pueden utilizarse para las entregas.  |
+| `buyerStatus`          | `BuyerStatus`       | Condición actual del comprador para realizar compras.                         |
 
 ---
 
@@ -312,7 +299,7 @@ recibir sus pedidos.
 - Es opcional.
 - Puede contener cero o más direcciones adicionales.
 
-### commercialStatus
+### buyerStatus
 
 Representa la condición comercial del comprador para realizar compras.
 
@@ -326,17 +313,19 @@ Representa la condición comercial del comprador para realizar compras.
 ## Relationships
 
 ```text
+
 User
-   │
-   └── Buyer
-         │
-         ├── owns ───────────────> Cart
-         │                            │
-         │                            └── contains ──> CartItem
-         │
-         └── creates ────────────> Order
-                                      │
-                                      └── contains ──> OrderItem
+   │
+   └── Buyer
+         │
+         ├── owns ───────────────> Cart
+         │                            │
+         │                            └── contains ──> CartItem
+         │
+         └── creates ────────────> Order
+                                      │
+                                      └── contains ──> OrderItem
+
 ```
 
 Un `Buyer` es una especialización de `User`. Un comprador puede tener un carrito activo y puede realizar múltiples pedidos durante su participación en el Marketplace.
@@ -348,7 +337,6 @@ Un `Buyer` es una especialización de `User`. Un comprador puede tener un carrit
 - El nombre completo no puede estar vacío.
 - Cada usuario debe tener un correo electrónico.
 - El correo electrónico debe ser único dentro de la plataforma.
-- El documento de identidad debe ser único dentro de la plataforma.
 
 ### Responsibilities
 
@@ -365,16 +353,6 @@ Las principales responsabilidades de `Buyer` son:
 - `Buyer` hereda de `User` porque comparte la información común de todos los participantes del sistema, pero posee información y responsabilidades específicas relacionadas con la compra.
 - La información de las direcciones no se coloca directamente en `User`, ya que no todos los participantes del Marketplace necesitan información de entrega.
 
-### Identity document
-
-La especificación establece que el documento de identidad debe ser único dentro
-de la plataforma. Sin embargo, la tabla de atributos del dominio de usuarios
-presenta únicamente el atributo `Identificador`.
-
-Por esta razón, el modelo mantiene `id` como identificador de la entidad y
-deja pendiente determinar si el documento de identidad debe representarse como
-un atributo independiente en una versión posterior del modelo.
-
 ---
 
 # Seller
@@ -387,26 +365,25 @@ Los vendedores son incorporados administrativamente por un `Administrator` y no 
 
 ## Attributes
 
-| Attribute    | Type              | Description                              |
-| ------------ | ----------------- | ---------------------------------------- |
-| `products`   | `List<Product>`   | Productos administrados por el vendedor. |
-| `warehouses` | `List<Warehouse>` | Bodegas asociadas al vendedor.           |
+Seller no agrega atributos propios en el modelo actual; hereda los atributos comunes de `User`. Las relaciones con `Product` y `Warehouse` se representan mediante asociaciones del dominio.
 
 ## Relationships
 
 ```text
+
 User
-   │
-   └── Seller
-         │
-         ├── manages ──────────> Product
-         │
-         └── owns ──────────────> Warehouse
+   │
+   └── Seller
+         │
+         ├── manages ──────────> Product
+         │
+         └── associated with ──> Warehouse (only when type = SELLER)
+
 ```
 
 Un Seller puede administrar múltiples productos.
 
-Un Seller posee al menos una bodega asociada dentro del modelo actual, ya que la incorporación de un vendedor contempla el registro de su primera bodega.
+La relación entre Seller y Warehouse depende del tipo de bodega. Una bodega de tipo SELLER se asocia con el vendedor correspondiente; una bodega de tipo MARKETPLACE pertenece a la operación central y no debe atribuirse automáticamente a un vendedor. No se establece aquí que cada vendedor deba poseer al menos una bodega.
 
 ### Business Rules
 
@@ -429,9 +406,7 @@ Las principales responsabilidades de Seller son:
 
 ### Design Notes
 
-No se agregan atributos como `products` o `warehouses` directamente dentro de Seller.
-
-Estas relaciones serán representadas mediante asociaciones con Product y Warehouse, evitando duplicar información y manteniendo separadas las responsabilidades de cada entidad.información de entrega.
+No se agregan atributos como `products` o `warehouses` directamente dentro de Seller. Estas relaciones se representan mediante asociaciones con Product y Warehouse, evitando duplicar información y manteniendo separadas las responsabilidades de cada entidad.
 
 ---
 
@@ -452,13 +427,15 @@ Las entidades administradas por el administrador se representan mediante relacio
 ### Relationships
 
 ```
+
 User
-   │
-   └── Administrator
-         │
-         ├── registers/manages ──> Seller
-         │
-         └── manages ────────────> Warehouse
+   │
+   └── Administrator
+         │
+         ├── registers/manages ──> Seller
+         │
+         └── manages ────────────> Warehouse
+
 ```
 
 ### Business Rules
@@ -481,7 +458,6 @@ Las principales responsabilidades de Administrator son:
 ### Design Notes
 
 No se agregan atributos como `sellers` o `warehouses` a Administrator.
-
 El hecho de que el administrador pueda administrar estas entidades representa una responsabilidad y una relación de negocio, no necesariamente una propiedad que deba almacenarse dentro de la entidad Administrator.
 
 ---
@@ -501,13 +477,15 @@ En el modelo actual no se identifican atributos propios adicionales para Logisti
 ### Relationships
 
 ```
+
 User
-   │
-   └── LogisticsOperator
-         │
-         ├── operates ─────────> Warehouse
-         │
-         └── manages ──────────> Shipment
+   │
+   └── LogisticsOperator
+         │
+         ├── operates ─────────> Warehouse
+         │
+         └── manages ──────────> Shipment
+
 ```
 
 ### Business Rules
@@ -534,72 +512,24 @@ El operador representa al participante que ejecuta las actividades, mientras que
 
 ---
 
-# Supervisor
-
-## Description
-
-Supervisor representa al usuario encargado de realizar actividades de consulta y seguimiento operativo dentro del Marketplace.
-
-Su función principal es proporcionar visibilidad sobre la operación sin asumir responsabilidades administrativas que correspondan a otros roles.
-
-## Attributes
-
-En el modelo actual no se identifican atributos propios adicionales para Supervisor además de los heredados de User.
-
-### Relationships
-
-```
-User
-   │
-   └── Supervisor
-         │
-         └── consults/follows ──> Business Operations
-```
-
-La relación anterior representa una responsabilidad de consulta y seguimiento, no una entidad adicional llamada `BusinessOperations`.
-
-### Business Rules
-
-- El supervisor posee un perfil orientado a consulta y seguimiento operativo.
-- No debe modificar información que corresponda a responsabilidades de otros roles.
-- No puede administrar información fuera de las responsabilidades de su rol.
-
-### Responsibilities
-
-Las principales responsabilidades de Supervisor son:
-
-- Consultar información operativa.
-- Realizar seguimiento de los procesos del Marketplace.
-- Obtener información necesaria para supervisar la operación.
-- Mantenerse dentro de las capacidades de consulta correspondientes a su rol.
-
-### Design Notes
-
-No se agregan listas de usuarios, vendedores, bodegas o productos como atributos de Supervisor.
-
-La capacidad de consultar información representa una responsabilidad del rol, no una colección de entidades que deba almacenarse dentro del objeto.
-
----
-
 # Product (Abstract)
 
 ## Description
 
 Product representa un bien ofrecido dentro del Marketplace.
 
-El catálogo diferencia entre productos físicos y productos digitales. Los productos físicos requieren inventario y despacho, mientras que los productos digitales pueden ser entregados inmediatamente después de la confirmación del pago.
+El catálogo diferencia entre productos físicos (`PhysicalProduct`) y productos digitales (`DigitalProduct`), representados mediante especialización de `Product`. Los productos físicos requieren inventario y despacho, mientras que los productos digitales pueden ser entregados inmediatamente después de la confirmación del pago.
 
 Product es una clase abstracta porque representa el concepto general de producto y sus especializaciones corresponden a las diferentes modalidades de producto ofrecidas por el Marketplace.
 
 ## Attributes
 
-| Attribute       | Type            | Description                                          |
-| --------------- | --------------- | ---------------------------------------------------- |
-| id              | String          | Identificador único del producto.                    |
-| characteristics | String          | Características generales que describen el producto. |
-| type            | ProductType     | Define si el producto es físico o digital.           |
-| variants        | List\<Variant\> | Diferentes variantes disponibles del producto.       |
-| status          | ProductStatus   | Estado actual del producto dentro del catálogo.      |
+| Attribute        | Type             | Description                                           |
+| ---------------- | ---------------- | ----------------------------------------------------- |
+| id               | String           | Identificador único del producto.                     |
+| characteristics  | String           | Características generales que describen el producto.  |
+| variants         | List<Variant\>   | Diferentes variantes disponibles del producto.        |
+| status           | ProductStatus    | Estado actual del producto dentro del catálogo.       |
 
 ### Attribute Details
 
@@ -611,13 +541,7 @@ Identifica de forma única al producto dentro del Marketplace.
 
 Representa las características generales definidas por el vendedor para el producto.
 
-**type**
-
-Define la modalidad del producto:
-
-- `PHYSICAL`
-- `DIGITAL`
-  **variants**
+**variants**
 
 Representa diferencias del producto tales como:
 
@@ -625,7 +549,8 @@ Representa diferencias del producto tales como:
 - talla;
 - modelo;
 - otras características relevantes.
-  **status**
+
+**status**
 
 Representa el estado actual del producto dentro del catálogo.
 
@@ -638,20 +563,22 @@ Los estados definidos por la especificación incluyen:
 ### Relationships
 
 ```
+
 Product
-   │
-   ├── PhysicalProduct
-   │       │
-   │       └── requires ──> Inventory
-   │
-   └── DigitalProduct
+   │
+   ├── PhysicalProduct
+   │       │
+   │       └── requires ──> Inventory
+   │
+   └── DigitalProduct
+
 ```
 
-Un producto también está relacionado con el Seller responsable de su administración.
+Cada Product se asocia con el Seller responsable de su publicación y administración. Esta asociación no obliga a guardar una lista `products` como atributo de `Seller`.
 
 ### Business Rules
 
-- Todo producto debe pertenecer a una de las modalidades definidas.
+- Todo producto debe corresponder a una de sus especializaciones: `PhysicalProduct` o `DigitalProduct`.
 - Los productos físicos requieren inventario.
 - Los productos físicos requieren despacho.
 - Los productos digitales no requieren inventario físico.
@@ -672,9 +599,7 @@ Las principales responsabilidades conceptuales de Product son:
 ### Design Notes
 
 Product es abstracta porque no representa por sí sola una modalidad concreta de producto.
-
 Las diferencias operativas entre productos físicos y digitales se representan mediante PhysicalProduct y DigitalProduct.
-
 La cantidad disponible no se almacena dentro de Product, ya que la existencia de productos físicos pertenece al dominio de Inventory.
 
 ---
@@ -696,13 +621,15 @@ La información general del producto es heredada de Product.
 ### Relationships
 
 ```
+
 Product
-   │
-   └── PhysicalProduct
-            │
-            └── requires ───────> Inventory
-                                      │
-                                      └── stored in ──> Warehouse
+   │
+   └── PhysicalProduct
+            │
+            └── requires ───────> Inventory
+                                      │
+                                      └── stored in ──> Warehouse
+
 ```
 
 ### Business Rules
@@ -722,7 +649,6 @@ Product
 ### Design Notes
 
 La cantidad disponible no pertenece a PhysicalProduct.
-
 La cantidad se administra mediante Inventory, debido a que un mismo producto puede tener existencias distribuidas en diferentes bodegas.
 
 ---
@@ -731,27 +657,21 @@ La cantidad se administra mediante Inventory, debido a que un mismo producto pue
 
 ## Description
 
-DigitalProduct representa un producto que no requiere almacenamiento físico ni despacho.
-
-Es una especialización de Product.
+`DigitalProduct` representa un producto que no requiere almacenamiento físico ni despacho. Es una especialización de `Product`.
 
 ## Attributes
 
-DigitalProduct no agrega atributos propios en el modelo actual.
-
-La información general del producto es heredada de Product.
+`DigitalProduct` no agrega atributos propios en el modelo actual. La información general del producto es heredada de `Product`.
 
 ### Relationships
 
-```
+```text
 Product
    │
    └── DigitalProduct
-            │
-            └── delivered after ──> PaymentConfirmation
 ```
 
-La entidad PaymentConfirmation representa aquí un concepto del flujo de negocio y no se incorpora todavía como una nueva entidad del modelo.
+La entrega digital es una operación del flujo de compra que ocurre después de confirmar el pago; no requiere una entidad adicional en el modelo actual.
 
 ### Business Rules
 
@@ -767,9 +687,7 @@ La entidad PaymentConfirmation representa aquí un concepto del flujo de negocio
 
 ### Design Notes
 
-No se agrega una cantidad de inventario físico a DigitalProduct.
-
-La ausencia de inventario físico es una diferencia fundamental respecto a PhysicalProduct.
+No se agrega una cantidad de inventario físico a `DigitalProduct`. La ausencia de inventario físico es una diferencia fundamental respecto a `PhysicalProduct`.
 
 ---
 
@@ -783,22 +701,22 @@ El sistema distingue entre bodegas pertenecientes al Marketplace y bodegas perte
 
 ## Attributes
 
-| Attribute | Type          | Description                                                            |
-| --------- | ------------- | ---------------------------------------------------------------------- |
-| id        | String        | Identificador único de la bodega.                                      |
-| location  | String        | Ubicación física de la bodega.                                         |
-| type      | WarehouseType | Clasifica la bodega como perteneciente al Marketplace o a un vendedor. |
+| Attribute  | Type           | Description                                                             |
+| ---------- | -------------- | ----------------------------------------------------------------------- |
+| id         | String         | Identificador único de la bodega.                                       |
+| location   | String         | Ubicación física de la bodega.                                          |
+| type       | WarehouseType  | Clasifica la bodega como perteneciente al Marketplace o a un vendedor.  |
 
 ### Relationships
 
 ```
-Seller
-   │
-   └── owns ───────────────> Warehouse
-                                │
-                                └── contains ───────> Inventory
-                                                        │
-                                                        └── references ──> PhysicalProduct
+
+Warehouse
+   └── contains ───────────> Inventory
+        └── references ────> PhysicalProduct
+
+Seller is associated only with Warehouse when type = SELLER.
+
 ```
 
 Una bodega puede estar asociada con múltiples registros de inventario,
@@ -808,7 +726,8 @@ correspondientes a diferentes productos almacenados en ella.
 
 - Las bodegas deben tener una ubicación.
 - Las bodegas deben pertenecer a una clasificación válida.
-- Se distinguen bodegas del Marketplace y bodegas de vendedores.
+- Se distinguen bodegas del Marketplace (`MARKETPLACE`) y bodegas de vendedores (`SELLER`).
+- Solo las bodegas de tipo `SELLER` se asocian con un vendedor específico.
 - El inventario físico debe estar asociado a una bodega específica.
 
 ### Responsibilities
@@ -820,7 +739,6 @@ correspondientes a diferentes productos almacenados en ella.
 ### Design Notes
 
 La cantidad de productos almacenados no se representa directamente mediante un atributo de Warehouse.
-
 La relación se realiza mediante Inventory, ya que el inventario debe estar vinculado obligatoriamente a un producto y a una bodega específica.
 
 ---
@@ -843,11 +761,11 @@ en cada ubicación de almacenamiento.
 
 ## Attributes
 
-| Attribute  | Type              | Description                                                 |
-| ---------- | ----------------- | ----------------------------------------------------------- |
-| `id`       | `String`          | Identificador único del registro de inventario.             |
-| `quantity` | `int`             | Cantidad de unidades disponibles del producto en la bodega. |
-| `status`   | `InventoryStatus` | Estado operativo del inventario.                            |
+| Attribute   | Type               | Description                                                     |
+| ----------- | ------------------ | --------------------------------------------------------------- |
+| `id`        | `String`           | Identificador único del registro de inventario.                 |
+| `quantity`  | `int`              | Cantidad de unidades registradas para el producto en la bodega. |
+| `status`    | `InventoryStatus`  | Estado operativo del inventario.                                |
 
 ---
 
@@ -870,7 +788,6 @@ la bodega correspondiente.
 ### status
 
 Representa el estado operativo del inventario.
-
 Entre los estados contemplados por las reglas de negocio se encuentra el estado
 `DAMAGED`, utilizado para identificar inventario que no puede ser reservado.
 
@@ -883,19 +800,21 @@ como el inventario dañado.
 ### Relationships
 
 ```text
+
 PhysicalProduct
-   │
-   └── has ──────────────────> Inventory
-                                  │
-                                  └── stored in ──────────> Warehouse
+   │
+   └── has ──────────────────> Inventory
+                                  │
+                                  └── stored in ──────────> Warehouse
+
 ```
 
 Cada registro de Inventory está asociado obligatoriamente con:
 
 - un PhysicalProduct;
 - una Warehouse.
-  Un producto físico puede tener múltiples registros de inventario cuando sus existencias se encuentran distribuidas entre diferentes bodegas.
 
+Un producto físico puede tener múltiples registros de inventario cuando sus existencias se encuentran distribuidas entre diferentes bodegas.
 Una bodega puede contener inventario correspondiente a múltiples productos.
 
 ### Business Rules
@@ -912,14 +831,13 @@ Una bodega puede contener inventario correspondiente a múltiples productos.
 Los movimientos de inventario representan las operaciones que modifican las existencias disponibles.
 
 Los movimientos definidos por la especificación son:
-
-| Movement      | Description                                                       |
+| Movement      | Description                                                       |
 | ------------- | ----------------------------------------------------------------- |
-| `INCOME`      | Registra el ingreso de nuevas existencias.                        |
-| `RESERVATION` | Reserva existencias para un proceso de compra.                    |
-| `SALE_EXIT`   | Registra la salida de existencias debido a una venta.             |
-| `ADJUSTMENT`  | Modifica las existencias para corregir diferencias de inventario. |
-| `RETURN`      | Registra el ingreso de unidades debido a una devolución.          |
+| `INCOME`      | Registra el ingreso de nuevas existencias.                        |
+| `RESERVATION` | Reserva existencias para un proceso de compra.                    |
+| `SALE_EXIT`   | Registra la salida de existencias debido a una venta.             |
+| `ADJUSTMENT`  | Modifica las existencias para corregir diferencias de inventario. |
+| `RETURN`      | Registra el ingreso de unidades debido a una devolución.          |
 
 Estos movimientos se consideran operaciones del dominio de Inventory y no entidades independientes dentro del modelo actual.
 
@@ -937,11 +855,8 @@ Las principales responsabilidades de Inventory son:
 ### Design Notes
 
 Inventory funciona como entidad intermedia entre PhysicalProduct y Warehouse.
-
 No se coloca la cantidad directamente en PhysicalProduct, porque un mismo producto puede tener existencias distribuidas en diferentes bodegas.
-
 Tampoco se coloca una lista de productos directamente en Warehouse, ya que la relación entre producto, cantidad y ubicación se representa mediante Inventory.
-
 Los movimientos de inventario se modelan inicialmente como operaciones de Inventory y no como una entidad independiente.
 
 ---
@@ -956,28 +871,28 @@ El carrito forma parte del proceso de compra y permite al comprador agregar, mod
 
 ## Attributes
 
-| Attribute | Type     | Description                      |
-| --------- | -------- | -------------------------------- |
-| `id`      | `String` | Identificador único del carrito. |
+| Attribute  | Type     | Description                       |
+| ---------- | -------- | --------------------------------- |
+| `id`       | `String` | Identificador único del carrito.  |
 
 La información del comprador y los productos contenidos se representan mediante relaciones con otras entidades del dominio.
 
 ### Relationships
 
 ```text
+
 Buyer
-   │
-   └── owns ─────────────────> Cart
-                                  │
-                                  └── contains ───────> CartItem
-                                                           │
-                                                           └── references ──> Product
+   │
+   └── owns ─────────────────> Cart
+                                  │
+                                  └── contains ───────> CartItem
+                                                           │
+                                                           └── references ──> Product
+
 ```
 
 Un comprador puede tener un carrito activo.
-
 Un carrito puede contener cero o múltiples CartItem.
-
 Cada CartItem referencia un único producto.
 
 ### Business Rules
@@ -1003,9 +918,7 @@ Las principales responsabilidades de Cart son:
 ### Design Notes
 
 Cart no almacena directamente una lista de productos.
-
 Los productos seleccionados se representan mediante CartItem, lo que permite mantener la cantidad de cada producto seleccionado.
-
 El carrito no representa una compra definitiva. Una vez que el comprador confirma la compra, el contenido relevante se transforma en elementos del pedido.
 
 ---
@@ -1022,23 +935,24 @@ Esta entidad evita almacenar directamente una lista simple de productos dentro d
 
 ## Attributes
 
-| Attribute  | Type     | Description                                          |
-| ---------- | -------- | ---------------------------------------------------- |
-| `id`       | `String` | Identificador único del elemento del carrito.        |
-| `quantity` | `int`    | Cantidad del producto seleccionada por el comprador. |
+| Attribute   | Type      | Description                                           |
+| ----------- | --------- | ----------------------------------------------------- |
+| `id`        | `String`  | Identificador único del elemento del carrito.         |
+| `quantity`  | `int`     | Cantidad del producto seleccionada por el comprador.  |
 
 ### Relationships
 
 ```text
+
 Cart
-   │
-   └── contains ─────────────> CartItem
-                                  │
-                                  └── references ───────> Product
+   │
+   └── contains ─────────────> CartItem
+                                  │
+                                  └── references ───────> Product
+
 ```
 
 Cada CartItem pertenece a un único Cart y referencia un único Product.
-
 Un Cart puede contener múltiples CartItem.
 
 ### Business Rules
@@ -1057,9 +971,7 @@ Un Cart puede contener múltiples CartItem.
 ### Design Notes
 
 CartItem mantiene una relación de composición con Cart.
-
 Si el carrito deja de existir, sus elementos dejan de tener sentido dentro del dominio.
-
 La cantidad no pertenece al Product, ya que representa una selección específica realizada por un comprador.
 
 ---
@@ -1076,66 +988,57 @@ A diferencia de `Cart`, el `Order` representa una operación comercial formaliza
 
 ## Attributes
 
-| Attribute | Type          | Description                                 |
-| --------- | ------------- | ------------------------------------------- |
-| `id`      | `String`      | Identificador único del pedido.             |
-| `status`  | `OrderStatus` | Estado actual del ciclo de vida del pedido. |
+| Attribute  | Type           | Description                                 |
+| ---------- | -------------- | ------------------------------------------- |
+| `id`       | `String`       | Identificador único del pedido.             |
+| `status`   | `OrderStatus`  | Estado actual del ciclo de vida del pedido. |
 
 ### Relationships
 
 ```text
+
 Buyer
-   │
-   └── creates ──────────────> Order
-                                  │
-                                  ├── contains ───────> OrderItem
-                                  │
-                                  ├── generates ──────> Shipment
-                                  │
-                                  ├── generates ──────> Invoice
-                                  │
-                                  └── may generate ───> Return
+   │
+   └── creates ──────────────> Order
+                                  │
+                                  ├── contains ───────> OrderItem
+                                  │
+                                  ├── generates ──────> Shipment
+                                  │
+                                  ├── generates ──────> Invoice
+                                  │
+                                  └── may generate ───> Return
+
 ```
 
 Un comprador puede generar múltiples pedidos.
-
 Un pedido contiene uno o más elementos de pedido.
-
 Un pedido puede generar un envío cuando contiene productos físicos.
-
-Un pedido puede generar una factura.
-
+Un pedido puede generar una factura, según el proceso de facturación implementado.
 Un pedido puede posteriormente generar una devolución.
 
 ### Order Lifecycle
 
-El ciclo de vida definido para los pedidos es:
+El ciclo de vida del pedido distingue la confirmación del pago, la entrega y el cierre final. `Cart` es una selección previa y no un estado de `Order`.
 
 ```text
-Cart
-  │
-  ▼
-PendingPayment
-  │
-  ▼
-Paid
-  │
-  ▼
-Dispatched
-  │
-  ▼
-Delivered / Finalized
+PENDING_PAYMENT
+       │
+       ▼
+     PAID
+       │
+       ├── pedido con productos físicos ──> DISPATCHED ──> DELIVERED ──> FINALIZED
+       │
+       └── pedido solo digital ───────────> entrega digital ───────────> FINALIZED
 ```
 
-Los estados representan las principales etapas del proceso comercial:
-
-| State                   | Description                                                         |
-| ----------------------- | ------------------------------------------------------------------- |
-| `CART`                  | Selección provisional de productos.                                 |
-| `PENDING_PAYMENT`       | El pedido espera la confirmación financiera.                        |
-| `PAID`                  | El pago fue confirmado y puede comenzar el proceso de alistamiento. |
-| `DISPATCHED`            | Los productos físicos han salido de la bodega.                      |
-| `DELIVERED / FINALIZED` | La entrega fue confirmada y el pedido concluyó satisfactoriamente.  |
+| State             | Description                                                    |
+| ----------------- | -------------------------------------------------------------- |
+| `PENDING_PAYMENT` | El pedido espera la confirmación del pago.                     |
+| `PAID`            | El pago fue confirmado y puede comenzar el proceso de entrega. |
+| `DISPATCHED`      | Los productos físicos han salido de la bodega.                 |
+| `DELIVERED`       | La entrega física fue confirmada.                              |
+| `FINALIZED`       | El pedido concluyó y queda cerrado para modificaciones.        |
 
 ### Business Rules
 
@@ -1144,7 +1047,8 @@ Los estados representan las principales etapas del proceso comercial:
 - El pedido debe mantener los productos que fueron efectivamente comprados.
 - Un pedido finalizado no puede ser modificado bajo ninguna circunstancia.
 - Los productos físicos requieren procesos de alistamiento y despacho.
-- Los productos digitales pueden ser entregados inmediatamente después de la confirmación del pago.
+- Los productos digitales pueden ser entregados inmediatamente después de la confirmación del pago y no requieren `Shipment`.
+- `DELIVERED` y `FINALIZED` son estados distintos: la entrega se confirma primero y la finalización ocurre después.
 - El estado del pedido debe seguir el ciclo de vida definido por el sistema.
 
 ### Responsibilities
@@ -1161,11 +1065,8 @@ Las principales responsabilidades de Order son:
 ### Design Notes
 
 Order no mantiene una referencia al Cart como su contenido permanente.
-
 El carrito representa una selección provisional, mientras que el pedido representa el resultado de la compra confirmada.
-
 Por esta razón, los productos que fueron eliminados del carrito antes de la confirmación no forman parte del pedido.
-
 Los productos comprados se representan mediante OrderItem.
 
 ---
@@ -1182,24 +1083,25 @@ A diferencia de `CartItem`, un `OrderItem` forma parte de una compra formalizada
 
 ## Attributes
 
-| Attribute  | Type     | Description                                             |
-| ---------- | -------- | ------------------------------------------------------- |
-| `id`       | `String` | Identificador único del elemento del pedido.            |
-| `quantity` | `int`    | Cantidad del producto adquirida.                        |
-| `price`    | `Money`  | Precio correspondiente al producto dentro de la compra. |
+| Attribute   | Type      | Description                                                  |
+| ----------- | --------- | ------------------------------------------------------------ |
+| `id`        | `String`  | Identificador único del elemento del pedido.                 |
+| `quantity`  | `int`     | Cantidad del producto adquirida.                             |
+| `price`     | `Money`   | Precio unitario aplicado al producto al confirmar la compra. |
 
 ### Relationships
 
 ```text
+
 Order
-   │
-   └── contains ─────────────> OrderItem
-                                  │
-                                  └── references ───────> Product
+   │
+   └── contains ─────────────> OrderItem
+                                  │
+                                  └── references ───────> Product
+
 ```
 
 Cada OrderItem pertenece a un único Order y referencia un único Product.
-
 Un pedido contiene uno o más elementos de pedido.
 
 ### Business Rules
@@ -1208,23 +1110,20 @@ Un pedido contiene uno o más elementos de pedido.
 - La cantidad comprada debe ser válida.
 - El elemento representa únicamente productos que fueron efectivamente incluidos en la compra confirmada.
 - Los elementos de un pedido finalizado no pueden modificarse.
-- El precio registrado corresponde al valor utilizado para representar la compra.
+- El precio registrado es el precio unitario aplicado al confirmar la compra y se conserva como parte del historial. El subtotal de la línea se obtiene a partir del precio unitario y la cantidad.
 
 ### Responsibilities
 
 - Representar un producto adquirido.
 - Mantener la cantidad comprada.
-- Mantener el precio correspondiente a la compra.
+- Mantener el precio unitario aplicado al confirmar la compra.
 - Formar parte del contenido permanente de un pedido.
 
 ### Design Notes
 
 OrderItem se mantiene separado de CartItem porque representan dos etapas diferentes del proceso de compra.
-
 CartItem representa una selección provisional que puede cambiar.
-
 OrderItem representa una compra confirmada y debe conservarse como parte del historial del pedido.
-
 La separación permite que los productos eliminados del carrito antes de la confirmación no aparezcan posteriormente en el pedido.
 
 ---
@@ -1241,24 +1140,25 @@ Los productos digitales no requieren un `Shipment`, debido a que su entrega se r
 
 ## Attributes
 
-| Attribute   | Type             | Description                                     |
-| ----------- | ---------------- | ----------------------------------------------- |
-| `id`        | `String`         | Identificador único del envío.                  |
-| `recipient` | `Address`        | Destinatario y ubicación asociada a la entrega. |
-| `status`    | `ShipmentStatus` | Estado actual del proceso de envío.             |
+| Attribute     | Type             | Description                                      |
+| ------------- | ---------------- | ------------------------------------------------ |
+| `id`          | `String`         | Identificador único del envío.                   |
+| `destination` | `Address`        | Dirección de destino del envío.                  |
+| `status`      | `ShipmentStatus` | Estado actual del proceso de envío.              |
 
 ### Relationships
 
 ```text
+
 Order
-   │
-   └── generates ────────────> Shipment
-                                  │
-                                  └── delivered to ────> Address
+   │
+   └── generates ────────────> Shipment
+                                  │
+                                  └── destination ─────> Address
+
 ```
 
 Un pedido puede generar un envío cuando requiere entrega física.
-
 Un pedido compuesto exclusivamente por productos digitales no requiere un envío físico.
 
 ### Business Rules
@@ -1275,7 +1175,7 @@ Un pedido compuesto exclusivamente por productos digitales no requiere un envío
 Las principales responsabilidades de Shipment son:
 
 - Representar el proceso de envío de un pedido.
-- Identificar el destinatario de la entrega.
+- Mantener la dirección de destino de la entrega.
 - Mantener el estado del proceso logístico.
 - Permitir el seguimiento de la entrega física.
 - Representar la finalización del proceso de entrega.
@@ -1304,9 +1204,9 @@ origina la venta.
 
 ## Attributes
 
-| Attribute | Type     | Description                        |
-| --------- | -------- | ---------------------------------- |
-| `id`      | `String` | Identificador único de la factura. |
+| Attribute  | Type     | Description                         |
+| ---------- | -------- | ----------------------------------- |
+| `id`       | `String` | Identificador único de la factura.  |
 
 No se agregan otros atributos específicos en el modelo actual debido a que la
 especificación funcional no define una estructura detallada para la factura.
@@ -1316,13 +1216,14 @@ especificación funcional no define una estructura detallada para la factura.
 ### Relationships
 
 ```text
+
 Order
-   │
-   └── generates ────────────> Invoice
+   │
+   └── generates ────────────> Invoice
+
 ```
 
 Una factura se genera como consecuencia de un pedido.
-
 La factura debe mantener la relación con el pedido al que corresponde.
 
 ### Business Rules
@@ -1353,29 +1254,29 @@ Por esta razón, el modelo no agrega atributos como impuestos, subtotal, descuen
 ## Description
 
 `Return` representa el proceso mediante el cual una compra puede entrar en un flujo de devolución después de haber sido realizada.
-
 Las devoluciones forman parte de los procesos de posventa incluidos dentro del alcance del Marketplace.
 
 ## Attributes
 
-| Attribute | Type     | Description                           |
-| --------- | -------- | ------------------------------------- |
-| `id`      | `String` | Identificador único de la devolución. |
+| Attribute  | Type     | Description                           |
+| ---------- | -------- | ------------------------------------- |
+| `id`       | `String` | Identificador único de la devolución. |
 
-La especificación no proporciona actualmente atributos adicionales para describir una devolución.
+La especificación disponible no define atributos adicionales para describir una devolución. Por ahora se conserva únicamente `id`; los atributos y estados del proceso quedan pendientes de una regla funcional concreta.
 
 ### Relationships
 
 ```text
+
 Order
-   │
-   └── may generate ────────> Return
-                                  │
-                                  └── may generate ──> Refund
+   │
+   └── may generate ────────> Return
+                                  │
+                                  └── may generate ──> Refund
+
 ```
 
 Una devolución está asociada con un pedido previamente realizado.
-
 Una devolución puede dar lugar a un reembolso.
 
 ### Business Rules
@@ -1410,27 +1311,27 @@ Las reglas específicas de devolución deberán definirse posteriormente si son 
 ## Description
 
 `Refund` representa el proceso mediante el cual se realiza un reembolso relacionado con una devolución.
-
 Los reembolsos forman parte de los procesos de posventa contemplados dentro del alcance del Marketplace.
 
 ## Attributes
 
-| Attribute | Type     | Description                        |
-| --------- | -------- | ---------------------------------- |
-| `id`      | `String` | Identificador único del reembolso. |
+| Attribute  | Type     | Description                         |
+| ---------- | -------- | ----------------------------------- |
+| `id`       | `String` | Identificador único del reembolso.  |
 
-La especificación funcional no define actualmente atributos adicionales para el reembolso.
+La especificación funcional no define actualmente atributos adicionales para el reembolso. Por ahora se conserva únicamente `id`; no se inventan campos de monto, fecha o método de pago sin requisitos que los respalden. Por ahora se conserva únicamente `id`; no se inventan campos de monto, fecha o método de pago sin requisitos que los respalden.
 
 ### Relationships
 
 ```text
+
 Return
-   │
-   └── may generate ─────────> Refund
+   │
+   └── may generate ─────────> Refund
+
 ```
 
 Un Refund está relacionado con una devolución.
-
 El reembolso permite mantener la trazabilidad entre el proceso de devolución y la compensación correspondiente.
 
 ### Business Rules
