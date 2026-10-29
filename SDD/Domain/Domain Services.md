@@ -208,7 +208,7 @@ PENDING_PAYMENT
 
 | Service           | Main Actor | Description                                                                           | Main Entity |
 | ----------------- | ---------- | ------------------------------------------------------------------------------------- | ----------- |
-| `GenerateInvoice` | System     | Genera la información de facturación correspondiente a un pedido con pago confirmado. | Order       |
+| `GenerateInvoice` | System     | Genera la información de facturación correspondiente a un pedido con pago confirmado. | Invoice     |
 
 ### Business Rules
 
@@ -232,7 +232,7 @@ PENDING_PAYMENT
 - Un envío debe estar asociado a un pedido válido que incluya productos físicos.
 - El envío debe tener un destino válido.
 - Solo se debe despachar un envío creado para un pedido cuyo pago haya sido confirmado.
-- No se deben crear envíos físicos para pedidos compuestos únicamente por productos virtuales.
+- Los productos digitales se entregan inmediatamente después de confirmar el pago y no requieren envío físico.
 - La confirmación de entrega debe registrarse antes de finalizar el pedido.
 - `ConfirmDelivery` se incluye una sola vez en el documento y se aplica tanto al envío como al estado del pedido relacionado.
 
@@ -252,7 +252,6 @@ PENDING_PAYMENT
 - La devolución debe respetar las condiciones definidas para el proceso de devoluciones.
 - Solo una devolución aprobada puede pasar al proceso de reembolso.
 - La aprobación de una devolución no implica que las unidades regresen automáticamente al inventario: primero deben recibirse y revisarse cuando corresponda.
-- Si se requiere devolver solo una parte de un pedido, el modelo debe identificar los productos y cantidades devueltos. Si `Return` solo referencia el pedido y el motivo, esta limitación debe resolverse en la revisión del modelo antes de implementar devoluciones parciales.
 
 ---
 
@@ -266,7 +265,6 @@ PENDING_PAYMENT
 
 - El reembolso debe estar asociado a una devolución existente y aprobada.
 - El reembolso debe corresponder a un pedido con pago confirmado.
-- No se debe procesar un reembolso dos veces por la misma devolución e importe.
 - La operación debe registrar el resultado del proceso. No se presupone una integración con una pasarela de pagos externa en esta primera entrega.
 - El reembolso y la reincorporación de unidades al inventario son operaciones relacionadas, pero distintas: solo se actualiza el inventario cuando las unidades hayan sido recibidas y declaradas aptas.
 

@@ -48,9 +48,14 @@ Buyer
    ├── primaryAddress ────────> Address
    │
    └── additionalAddresses ──> Address
+
+Shipment
+   │
+   └── destination ───────────> Address
 ```
 
 La especificación establece que la dirección principal es obligatoria y que las direcciones adicionales son opcionales.
+`Address` tambien es utilizado para representar el destino de un `Shipment` ya que en el modelo del dominio se contempla esta relacion.
 
 ### Business Rules
 
@@ -84,24 +89,22 @@ Se propone como Value Object para evitar representar los valores monetarios como
 
 ## Attributes
 
-| Attribute  | Type      | Description                              |
-| ---------- | --------- | ---------------------------------------- |
-| `amount`   | `Decimal` | Valor numérico de la cantidad monetaria. |
-| `currency` | `String`  | Moneda en la que se expresa el valor.    |
+| Attribute  | Type         | Description                              |
+| ---------- | ------------ | ---------------------------------------- |
+| `amount`   | `BigDecimal` | Valor numérico de la cantidad monetaria. |
+| `currency` | `String`     | Moneda en la que se expresa el valor.    |
 
 ## Usage
 
 Money puede utilizarse en los elementos que necesiten representar valores económicos, como el precio de un producto o el valor asociado a una operación comercial.
 
 ```text
-Product
-   │
-   └── price ────────────────> Money
-
 OrderItem
    │
    └── price ────────────────> Money
 ```
+
+El precio de `OrderItem` corresponde al precio unitario aplicado a la compra.
 
 ### Business Rules
 

@@ -1,0 +1,6 @@
+{
+  "java.project.sourcePaths": [
+    "Market/src/main/java",
+    "demo/src/main/java/application"
+  ]
+}
