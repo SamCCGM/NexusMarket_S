@@ -114,7 +114,6 @@
 	</dependencies>
 
 	<build>
-		<sourceDirectory>src/main/java/application</sourceDirectory>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
