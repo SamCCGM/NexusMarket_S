@@ -1,16 +1,16 @@
-package application.config;
+package application.application.config;
 
-import application.domain.enums.UserRole;
-import application.domain.enums.UserStatus;
-import application.persistence.mysql.entity.AdministratorEntity;
-import application.persistence.mysql.entity.BuyerEntity;
-import application.persistence.mysql.entity.SellerEntity;
-import application.persistence.mysql.entity.UserEntity;
-import application.persistence.mysql.repository.AdministratorRepository;
-import application.persistence.mysql.repository.BuyerRepository;
-import application.persistence.mysql.repository.SellerRepository;
-import application.persistence.mysql.repository.UserRepository;
-import application.service.UserService;
+import application.application.domain.enums.UserRole;
+import application.application.domain.enums.UserStatus;
+import application.application.persistence.mysql.entity.AdministratorEntity;
+import application.application.persistence.mysql.entity.BuyerEntity;
+import application.application.persistence.mysql.entity.SellerEntity;
+import application.application.persistence.mysql.entity.UserEntity;
+import application.application.persistence.mysql.repository.AdministratorRepository;
+import application.application.persistence.mysql.repository.BuyerRepository;
+import application.application.persistence.mysql.repository.SellerRepository;
+import application.application.persistence.mysql.repository.UserRepository;
+import application.application.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
@@ -60,7 +60,7 @@ public class DataInitializer {
                         .role(UserRole.BUYER)
                         .status(UserStatus.ACTIVE)
                         .phoneNumber("+1234567891")
-                        .buyerStatus(application.domain.enums.BuyerStatus.ACTIVE)
+                        .buyerStatus(application.application.domain.enums.BuyerStatus.ACTIVE)
                         .build();
 
                 buyerRepository.save(buyer);

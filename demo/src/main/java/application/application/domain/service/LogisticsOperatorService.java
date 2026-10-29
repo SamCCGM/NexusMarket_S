@@ -1,7 +1,7 @@
-package application.service;
+package application.application.service;
 
-import application.persistence.mysql.entity.LogisticsOperatorEntity;
-import application.persistence.mysql.repository.LogisticsOperatorRepository;
+import application.application.persistence.mysql.entity.LogisticsOperatorEntity;
+import application.application.persistence.mysql.repository.LogisticsOperatorRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

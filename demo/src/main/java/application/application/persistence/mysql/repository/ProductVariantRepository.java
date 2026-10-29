@@ -1,6 +1,6 @@
-package application.persistence.mysql.repository;
+package application.application.persistence.mysql.repository;
 
-import application.persistence.mysql.entity.ProductVariantEntity;
+import application.application.persistence.mysql.entity.ProductVariantEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

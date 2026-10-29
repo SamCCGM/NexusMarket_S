@@ -1,7 +1,7 @@
-package application.service;
+package application.application.service;
 
-import application.persistence.mongodb.document.ShipmentTrackingDocument;
-import application.persistence.mongodb.repository.ShipmentTrackingRepository;
+import application.application.persistence.mongodb.document.ShipmentTrackingDocument;
+import application.application.persistence.mongodb.repository.ShipmentTrackingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

@@ -1,10 +1,10 @@
-package application.service;
+package application.application.service;
 
-import application.persistence.mysql.entity.OrderEntity;
-import application.persistence.mysql.entity.OrderItemEntity;
-import application.persistence.mysql.repository.OrderRepository;
-import application.persistence.mysql.repository.OrderItemRepository;
-import application.domain.enums.OrderStatus;
+import application.application.persistence.mysql.entity.OrderEntity;
+import application.application.persistence.mysql.entity.OrderItemEntity;
+import application.application.persistence.mysql.repository.OrderRepository;
+import application.application.persistence.mysql.repository.OrderItemRepository;
+import application.application.domain.enums.OrderStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

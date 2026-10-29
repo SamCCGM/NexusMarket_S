@@ -1,7 +1,7 @@
-package application.domain.models;
+package application.application.domain.models;
 
-import application.domain.enums.ShipmentStatus;
-import application.domain.valueobjects.Address;
+import application.application.domain.enums.ShipmentStatus;
+import application.application.domain.valueObjects.Address;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;

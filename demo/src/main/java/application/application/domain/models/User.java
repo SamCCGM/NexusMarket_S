@@ -1,7 +1,7 @@
-package application.domain.models;
+package application.application.domain.models;
 
-import application.domain.enums.UserRole;
-import application.domain.enums.UserStatus;
+import application.application.domain.enums.UserRole;
+import application.application.domain.enums.UserStatus;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;

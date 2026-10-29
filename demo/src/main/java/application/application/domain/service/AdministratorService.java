@@ -1,7 +1,7 @@
-package application.service;
+package application.application.service;
 
-import application.persistence.mysql.entity.AdministratorEntity;
-import application.persistence.mysql.repository.AdministratorRepository;
+import application.application.persistence.mysql.entity.AdministratorEntity;
+import application.application.persistence.mysql.repository.AdministratorRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

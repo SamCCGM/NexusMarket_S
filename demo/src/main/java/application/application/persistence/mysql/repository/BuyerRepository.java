@@ -1,6 +1,6 @@
-package application.persistence.mysql.repository;
+package application.application.persistence.mysql.repository;
 
-import application.persistence.mysql.entity.BuyerEntity;
+import application.application.persistence.mysql.entity.BuyerEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,11 +12,9 @@ import java.util.Optional;
 @Repository
 public interface BuyerRepository extends JpaRepository<BuyerEntity, Long> {
 
-    // Herencia JOINED: el id del comprador es el mismo id del usuario.
-    @Query("SELECT b FROM BuyerEntity b WHERE b.id = :userId")
-    Optional<BuyerEntity> findByUserEntityId(@Param("userId") Long userId);
+    Optional<BuyerEntity> findByUserEntityId(Long userId);
 
-    @Query("SELECT b FROM BuyerEntity b WHERE b.email = :email")
+    @Query("SELECT b FROM BuyerEntity b JOIN b.userEntity u WHERE u.email = :email")
     Optional<BuyerEntity> findByUserEntityEmail(@Param("email") String email);
 
     List<BuyerEntity> findByBuyerStatus(String status);

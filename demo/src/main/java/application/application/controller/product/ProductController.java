@@ -1,14 +1,14 @@
-package application.controller.product;
+package application.application.controller.product;
 
-import application.dto.product.ProductRequest;
-import application.dto.product.ProductResponse;
-import application.dto.product.ProductVariantRequest;
-import application.dto.product.ProductVariantResponse;
-import application.persistence.mysql.entity.ProductEntity;
-import application.persistence.mysql.entity.ProductVariantEntity;
-import application.persistence.mysql.entity.SellerEntity;
-import application.service.ProductService;
-import application.service.SellerService;
+import application.application.dto.product.ProductRequest;
+import application.application.dto.product.ProductResponse;
+import application.application.dto.product.ProductVariantRequest;
+import application.application.dto.product.ProductVariantResponse;
+import application.application.persistence.mysql.entity.ProductEntity;
+import application.application.persistence.mysql.entity.ProductVariantEntity;
+import application.application.persistence.mysql.entity.SellerEntity;
+import application.application.service.ProductService;
+import application.application.service.SellerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -42,12 +42,12 @@ public class ProductController {
             products = new org.springframework.data.domain.PageImpl<>(searchResults, pageable, searchResults.size());
         } else if (status != null) {
             products = productService.findByStatus(
-                    application.domain.enums.ProductStatus.valueOf(status.toUpperCase()), pageable);
+                    application.application.domain.enums.ProductStatus.valueOf(status.toUpperCase()), pageable);
         } else if (category != null) {
             List<ProductEntity> categoryProducts = productService.findByCategory(category);
             products = new org.springframework.data.domain.PageImpl<>(categoryProducts, pageable, categoryProducts.size());
         } else {
-            products = productService.findByStatus(application.domain.enums.ProductStatus.PUBLISHED, pageable);
+            products = productService.findByStatus(application.application.domain.enums.ProductStatus.PUBLISHED, pageable);
         }
 
         return ResponseEntity.ok(products.map(this::toResponse));
@@ -261,7 +261,7 @@ public class ProductController {
 
     private ProductEntity toEntity(ProductRequest request, SellerEntity seller) {
         // Determine product type based on request or default to physical
-        ProductEntity product = new application.persistence.mysql.entity.PhysicalProductEntity();
+        ProductEntity product = new application.application.persistence.mysql.entity.PhysicalProductEntity();
         product.setName(request.getName());
         product.setDescription(request.getDescription());
         product.setBasePrice(request.getBasePrice());

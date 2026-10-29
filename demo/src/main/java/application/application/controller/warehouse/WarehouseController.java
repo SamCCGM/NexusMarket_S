@@ -1,11 +1,11 @@
-package application.controller.warehouse;
+package application.application.controller.warehouse;
 
-import application.dto.warehouse.WarehouseRequest;
-import application.dto.warehouse.WarehouseResponse;
-import application.persistence.mysql.entity.SellerEntity;
-import application.persistence.mysql.entity.WarehouseEntity;
-import application.service.SellerService;
-import application.service.WarehouseService;
+import application.application.dto.warehouse.WarehouseRequest;
+import application.application.dto.warehouse.WarehouseResponse;
+import application.application.persistence.mysql.entity.SellerEntity;
+import application.application.persistence.mysql.entity.WarehouseEntity;
+import application.application.service.SellerService;
+import application.application.service.WarehouseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,7 +31,7 @@ public class WarehouseController {
         List<WarehouseEntity> warehouses;
         if (type != null) {
             warehouses = warehouseService.findByType(
-                    application.domain.enums.WarehouseType.valueOf(type.toUpperCase()));
+                    application.application.domain.enums.WarehouseType.valueOf(type.toUpperCase()));
         } else if (activeOnly) {
             warehouses = warehouseService.findByActiveTrue();
         } else {
@@ -147,7 +147,7 @@ public class WarehouseController {
         warehouse.setState(request.getState());
         warehouse.setCountry(request.getCountry());
         warehouse.setPostalCode(request.getPostalCode());
-        warehouse.setType(application.domain.enums.WarehouseType.valueOf(request.getType().toUpperCase()));
+        warehouse.setType(application.application.domain.enums.WarehouseType.valueOf(request.getType().toUpperCase()));
         warehouse.setCapacity(request.getCapacity());
         warehouse.setActive(request.isActive());
         warehouse.setSeller(seller);
@@ -161,7 +161,7 @@ public class WarehouseController {
         entity.setState(request.getState());
         entity.setCountry(request.getCountry());
         entity.setPostalCode(request.getPostalCode());
-        entity.setType(application.domain.enums.WarehouseType.valueOf(request.getType().toUpperCase()));
+        entity.setType(application.application.domain.enums.WarehouseType.valueOf(request.getType().toUpperCase()));
         entity.setCapacity(request.getCapacity());
         entity.setActive(request.isActive());
     }

@@ -1,6 +1,6 @@
-package application.domain.models;
+package application.application.domain.models;
 
-import application.domain.enums.WarehouseType;
+import application.application.domain.enums.WarehouseType;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
