@@ -70,8 +70,9 @@ public class WarehouseController {
         SellerEntity seller = sellerService.findByUserEntityEmail(email)
                 .orElseThrow(() -> new RuntimeException("Seller profile not found"));
 
+        // RegisterWarehouse (SDD): valida ubicacion y tipo (SELLER requiere vendedor)
         WarehouseEntity warehouse = toEntity(request, seller);
-        WarehouseEntity saved = warehouseService.save(warehouse);
+        WarehouseEntity saved = warehouseService.registerWarehouse(warehouse);
         return ResponseEntity.ok(toResponse(saved));
     }
 
@@ -87,15 +88,15 @@ public class WarehouseController {
                     String email = authentication.getName();
                     SellerEntity seller = sellerService.findByUserEntityEmail(email)
                             .orElseThrow(() -> new RuntimeException("Seller profile not found"));
-                    
-                    if (!existing.getSeller().getId().equals(seller.getId()) && 
+
+                    if (!existing.getSeller().getId().equals(seller.getId()) &&
                         !authentication.getAuthorities().stream()
                             .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRATOR"))) {
                         return ResponseEntity.status(403).<WarehouseResponse>build();
                     }
 
-                    updateEntity(existing, request);
-                    WarehouseEntity updated = warehouseService.save(existing);
+                    // UpdateWarehouse (SDD): valida existencia y reglas de registro
+                    WarehouseEntity updated = warehouseService.updateWarehouse(id, toEntity(request, existing.getSeller()));
                     return ResponseEntity.ok(toResponse(updated));
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -154,15 +155,4 @@ public class WarehouseController {
         return warehouse;
     }
 
-    private void updateEntity(WarehouseEntity entity, WarehouseRequest request) {
-        entity.setName(request.getName());
-        entity.setAddress(request.getAddress());
-        entity.setCity(request.getCity());
-        entity.setState(request.getState());
-        entity.setCountry(request.getCountry());
-        entity.setPostalCode(request.getPostalCode());
-        entity.setType(application.domain.enums.WarehouseType.valueOf(request.getType().toUpperCase()));
-        entity.setCapacity(request.getCapacity());
-        entity.setActive(request.isActive());
-    }
 }

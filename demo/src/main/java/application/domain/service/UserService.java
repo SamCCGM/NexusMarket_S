@@ -32,6 +32,14 @@ public class UserService {
         return userRepository.findByEmail(email);
     }
 
+    public Optional<UserEntity> findById(Long id) {
+        return userRepository.findById(id);
+    }
+
+    public List<UserEntity> findAll() {
+        return userRepository.findAll();
+    }
+
     public Optional<UserEntity> authenticate(String email, String password) {
         return userRepository.findByEmailAndPassword(email, password);
     }

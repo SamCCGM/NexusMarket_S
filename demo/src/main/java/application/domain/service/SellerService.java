@@ -52,6 +52,9 @@ public class SellerService {
         if (seller.getStatus() == null) {
             seller.setStatus(UserStatus.ACTIVE);
         }
+        if (seller.getRole() == null) {
+            seller.setRole(application.domain.enums.UserRole.SELLER);
+        }
         return sellerRepository.save(seller);
     }
 
