@@ -78,7 +78,7 @@ public class OrderEntity {
     @Column(name = "delivered_at")
     private LocalDateTime deliveredAt;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<OrderItemEntity> items;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
