@@ -1,5 +1,6 @@
 package application.domain.dto.inventory;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 /**
@@ -10,7 +11,9 @@ import lombok.Data;
  */
 @Data
 public class StockMovementRequest {
+    @NotNull
     private Long warehouseId;
+    @NotNull
     private Long productId;
     private String variantId;
     private Integer quantity;

@@ -19,4 +19,11 @@ public class Variant {
     private String name;
     private String value;
 
+    /** Una variante debe definir el atributo que la diferencia. */
+    public void assertValid() {
+        if (name == null || name.isBlank() || value == null || value.isBlank()) {
+            throw new application.exception.BusinessRuleException(
+                    "La variante debe definir nombre y valor del atributo");
+        }
+    }
 }

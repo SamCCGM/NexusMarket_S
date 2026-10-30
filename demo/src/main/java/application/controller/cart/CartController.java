@@ -7,6 +7,7 @@ import application.persistence.mongodb.document.CartDocument;
 import application.persistence.mongodb.document.CartItemDocument;
 import application.domain.service.BuyerService;
 import application.domain.service.CartMongoService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -35,7 +36,7 @@ public class CartController {
 
     @PostMapping("/items")
     public ResponseEntity<CartResponse> addItem(
-            @RequestBody CartItemRequest request,
+            @RequestBody @Valid CartItemRequest request,
             Authentication authentication) {
         
         Long buyerId = getBuyerIdFromAuth(authentication);

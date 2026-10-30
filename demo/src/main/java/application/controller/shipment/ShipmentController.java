@@ -5,6 +5,7 @@ import application.domain.dto.shipment.ShipmentResponse;
 import application.domain.service.OrderService;
 import application.persistence.mysql.entity.ShipmentEntity;
 import application.persistence.mysql.repository.ShipmentRepository;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -33,7 +34,7 @@ public class ShipmentController {
     @PreAuthorize("hasRole('LOGISTICS_OPERATOR') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<ShipmentResponse> createShipment(
             @PathVariable Long orderId,
-            @RequestBody(required = false) ShipmentCreateRequest request) {
+            @RequestBody(required = false) @Valid ShipmentCreateRequest request) {
 
         ShipmentEntity saved = orderService.createShipment(
                 orderId,

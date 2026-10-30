@@ -39,7 +39,7 @@ public abstract class ProductEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private ProductStatus status = ProductStatus.PUBLISHED;
+    private ProductStatus status = ProductStatus.SUSPENDED;
 
     @Column(name = "category", length = 100)
     private String category;

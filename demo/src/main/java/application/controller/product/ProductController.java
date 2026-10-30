@@ -9,6 +9,7 @@ import application.persistence.mysql.entity.ProductVariantEntity;
 import application.persistence.mysql.entity.SellerEntity;
 import application.domain.service.ProductService;
 import application.domain.service.SellerService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -81,7 +82,7 @@ public class ProductController {
     @PostMapping
     @PreAuthorize("hasRole('SELLER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<ProductResponse> createProduct(
-            @RequestBody ProductRequest request,
+            @RequestBody @Valid ProductRequest request,
             Authentication authentication) {
         
         String email = authentication.getName();
@@ -105,7 +106,7 @@ public class ProductController {
     @PreAuthorize("hasRole('SELLER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<ProductResponse> updateProduct(
             @PathVariable Long id,
-            @RequestBody ProductRequest request,
+            @RequestBody @Valid ProductRequest request,
             Authentication authentication) {
         
         return productService.findById(id)
@@ -209,7 +210,7 @@ public class ProductController {
     @PreAuthorize("hasRole('SELLER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<ProductVariantResponse> addVariant(
             @PathVariable Long productId,
-            @RequestBody ProductVariantRequest request) {
+            @RequestBody @Valid ProductVariantRequest request) {
         
         return productService.findById(productId)
                 .map(product -> {

@@ -6,6 +6,7 @@ import application.persistence.mysql.entity.SellerEntity;
 import application.persistence.mysql.entity.WarehouseEntity;
 import application.domain.service.SellerService;
 import application.domain.service.WarehouseService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -63,7 +64,7 @@ public class WarehouseController {
     @PostMapping
     @PreAuthorize("hasRole('SELLER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<WarehouseResponse> createWarehouse(
-            @RequestBody WarehouseRequest request,
+            @RequestBody @Valid WarehouseRequest request,
             Authentication authentication) {
         
         String email = authentication.getName();
@@ -80,7 +81,7 @@ public class WarehouseController {
     @PreAuthorize("hasRole('SELLER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<WarehouseResponse> updateWarehouse(
             @PathVariable Long id,
-            @RequestBody WarehouseRequest request,
+            @RequestBody @Valid WarehouseRequest request,
             Authentication authentication) {
         
         return warehouseService.findById(id)

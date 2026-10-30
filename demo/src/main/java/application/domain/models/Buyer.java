@@ -24,4 +24,20 @@ public class Buyer extends User {
     private List<Address> additionalAddresses;
     private BuyerStatus buyerStatus;
 
+    /**
+     * UpdateBuyer: actualiza los datos del comprador.
+     * El comprador puede mantener su informacion solo estando activo.
+     */
+    public void assertCanUpdateProfile() {
+        assertIdentity();
+        if (!canOperate()) {
+            throw new application.exception.BusinessRuleException(
+                    "Un comprador bloqueado no puede actualizar su informacion");
+        }
+    }
+
+    /** El comprador necesita una direccion principal para compras fisicas. */
+    public boolean hasValidDeliveryAddress() {
+        return primaryAddress != null && primaryAddress.hasText();
+    }
 }

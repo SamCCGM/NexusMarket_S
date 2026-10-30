@@ -4,6 +4,7 @@ import application.domain.dto.inventory.InventoryResponse;
 import application.domain.dto.inventory.StockMovementRequest;
 import application.persistence.mongodb.document.InventoryDocument;
 import application.domain.service.InventoryMongoService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -50,7 +51,7 @@ public class InventoryController {
      */
     @PostMapping("/stock/add")
     @PreAuthorize("hasRole('SELLER') or hasRole('LOGISTICS_OPERATOR') or hasRole('ADMINISTRATOR')")
-    public ResponseEntity<InventoryResponse> addStock(@RequestBody StockMovementRequest request) {
+    public ResponseEntity<InventoryResponse> addStock(@RequestBody @Valid StockMovementRequest request) {
         return ResponseEntity.ok(toResponse(
                 inventoryService.addStock(request.getWarehouseId(), request.getProductId(),
                         request.getVariantId(), request.getQuantity())));
@@ -62,7 +63,7 @@ public class InventoryController {
      */
     @PostMapping("/stock/reserve")
     @PreAuthorize("hasRole('ADMINISTRATOR')")
-    public ResponseEntity<InventoryResponse> reserveStock(@RequestBody StockMovementRequest request) {
+    public ResponseEntity<InventoryResponse> reserveStock(@RequestBody @Valid StockMovementRequest request) {
         return ResponseEntity.ok(toResponse(
                 inventoryService.reserveStock(request.getWarehouseId(), request.getProductId(),
                         request.getVariantId(), request.getQuantity())));
@@ -73,7 +74,7 @@ public class InventoryController {
      */
     @PostMapping("/stock/remove")
     @PreAuthorize("hasRole('LOGISTICS_OPERATOR') or hasRole('ADMINISTRATOR')")
-    public ResponseEntity<InventoryResponse> removeStock(@RequestBody StockMovementRequest request) {
+    public ResponseEntity<InventoryResponse> removeStock(@RequestBody @Valid StockMovementRequest request) {
         return ResponseEntity.ok(toResponse(
                 inventoryService.removeStock(request.getWarehouseId(), request.getProductId(),
                         request.getVariantId(), request.getQuantity())));
@@ -84,7 +85,7 @@ public class InventoryController {
      */
     @PostMapping("/stock/adjust")
     @PreAuthorize("hasRole('LOGISTICS_OPERATOR') or hasRole('ADMINISTRATOR')")
-    public ResponseEntity<InventoryResponse> adjustStock(@RequestBody StockMovementRequest request) {
+    public ResponseEntity<InventoryResponse> adjustStock(@RequestBody @Valid StockMovementRequest request) {
         return ResponseEntity.ok(toResponse(
                 inventoryService.adjustStock(request.getWarehouseId(), request.getProductId(),
                         request.getVariantId(), request.getQuantity())));
@@ -95,7 +96,7 @@ public class InventoryController {
      */
     @PostMapping("/stock/return")
     @PreAuthorize("hasRole('LOGISTICS_OPERATOR') or hasRole('ADMINISTRATOR')")
-    public ResponseEntity<InventoryResponse> returnStock(@RequestBody StockMovementRequest request) {
+    public ResponseEntity<InventoryResponse> returnStock(@RequestBody @Valid StockMovementRequest request) {
         return ResponseEntity.ok(toResponse(
                 inventoryService.returnStock(request.getWarehouseId(), request.getProductId(),
                         request.getVariantId(), request.getQuantity())));

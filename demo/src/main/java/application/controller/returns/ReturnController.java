@@ -3,6 +3,7 @@ package application.controller.returns;
 import application.domain.dto.returns.ReturnRequest;
 import application.domain.dto.returns.ReturnResponse;
 import application.domain.service.ReturnService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,7 +31,7 @@ public class ReturnController {
     @PostMapping
     @PreAuthorize("hasRole('BUYER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<ReturnResponse> requestReturn(
-            @RequestBody ReturnRequest request,
+            @RequestBody @Valid ReturnRequest request,
             Authentication authentication) {
 
         return ResponseEntity.ok(

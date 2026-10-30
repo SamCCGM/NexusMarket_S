@@ -21,4 +21,16 @@ public class Address {
 
     private String value;
 
+    /** Una direccion necesita un valor identificador para ser utilizada. */
+    public boolean hasText() {
+        return value != null && !value.isBlank();
+    }
+
+    /** Valida que la direccion sirva como destino (regla de envios). */
+    public void assertValidDestination() {
+        if (!hasText()) {
+            throw new application.exception.BusinessRuleException(
+                    "El envio debe tener un destino valido");
+        }
+    }
 }

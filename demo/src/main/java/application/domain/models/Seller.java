@@ -19,4 +19,23 @@ import lombok.Setter;
 @NoArgsConstructor
 public class Seller extends User {
 
+    /**
+     * Los vendedores son incorporados administrativamente; para comerciar en
+     * el Marketplace su cuenta debe estar activa (no bloqueada).
+     */
+    public boolean canOperateInMarketplace() {
+        return canOperate();
+    }
+
+    /**
+     * UpdateSeller: mantiene los datos del vendedor.
+     * Un vendedor bloqueado no puede actualizar su informacion.
+     */
+    public void assertCanUpdateSellerProfile() {
+        assertIdentity();
+        if (!canOperate()) {
+            throw new application.exception.BusinessRuleException(
+                    "Un vendedor bloqueado no puede actualizar su informacion");
+        }
+    }
 }
