@@ -116,9 +116,15 @@ public class OrderService {
      * - Los productos fisicos requieren disponibilidad en el inventario
      *   (suma de existencias disponibles en las bodegas). Si no hay
      *   disponibilidad suficiente, no se crea el pedido.
+     * - ReserveStock: al confirmar la creacion del pedido se reservan las
+     *   unidades fisicas (hold pre-pago); la reserva se consume como
+     *   SALE_EXIT al despachar y evita sobreventa mientras el pago esta
+     *   pendiente.
      * - El pedido inicia en PENDING_PAYMENT.
      * - El precio unitario se toma del sistema (precio de la variante o precio
      *   base del producto), nunca del carrito del cliente.
+     * - Una vez creado el pedido las unidades salen del carrito (ClearCart):
+     *   el pedido ya formalizo la compra de su contenido vigente.
      */
     public OrderEntity createOrder(Long buyerId, String currency, String notes) {
         if (buyerId == null) {
@@ -168,7 +174,25 @@ public class OrderService {
                 .subtract(order.getDiscountAmount() == null ? BigDecimal.ZERO : order.getDiscountAmount()));
         order.setOrderNumber(generateOrderNumber());
 
-        return orderRepository.save(order);
+        OrderEntity saved = orderRepository.save(order);
+
+        // ReserveStock: hold pre-pago de las unidades fisicas del pedido.
+        for (OrderItemEntity item : saved.getItems()) {
+            if (requiresPhysical(item.getProduct())) {
+                reserveStockForOrder(
+                        item.getProduct().getId(),
+                        item.getVariant() == null ? null : String.valueOf(item.getVariant().getId()),
+                        item.getQuantity(),
+                        item.getProduct().getName());
+            }
+        }
+
+        // ClearCart: el pedido formalizo la compra del contenido vigente del carrito.
+        cartMongoService.clearCart(buyerId);
+        notificationPort.notifyOrderEvent(saved.getId(),
+                "Pedido creado: " + saved.getOrderNumber() + " (queda PENDING_PAYMENT)");
+
+        return saved;
     }
 
     /**
@@ -551,14 +575,51 @@ public class OrderService {
     }
 
     /**
+     * ReserveStock al crear el pedido: reserva unidades de manera consistente
+     * a traves de las bodegas disponibles (cantidad disponible desc). Usa la
+     * MISMA asignacion que removeStockForOrder para que el SALE_EXIT consume
+     * exactamente la reserva hecha aqui.
+     */
+    private void reserveStockForOrder(Long productId, String variantId, Integer quantity, String productName) {
+        int remaining = quantity;
+        List<InventoryDocument> rows = inventoryMongoService.findByProductId(productId).stream()
+                .filter(i -> Objects.equals(i.getVariantId(), variantId))
+                .filter(i -> i.getStatus() != InventoryStatus.DAMAGED)
+                .sorted(Comparator.comparingInt(InventoryDocument::getAvailableQuantity).reversed())
+                .toList();
+
+        for (InventoryDocument row : rows) {
+            if (remaining <= 0) {
+                break;
+            }
+            int partial = Math.min(remaining, row.getAvailableQuantity());
+            if (partial > 0) {
+                inventoryMongoService.reserveStock(row.getWarehouseId(), productId, variantId, partial);
+                remaining -= partial;
+            }
+        }
+
+        if (remaining > 0) {
+            throw new BusinessRuleException(
+                    "No hay disponibilidad para reservar el producto " + productName
+                            + " (faltan " + remaining + " unidades)");
+        }
+    }
+
+    /**
      * Sale exit del inventario al despachar: descuenta unidades de manera
-     * consistente a traves de las bodegas que contienen el producto.
+     * consistente a traves de las bodegas que contienen el producto. Consume
+     * primero las filas con reserva (el hold pre-pago de este pedido) y luego
+     * las restantes por cantidad total; removeStock libera la reserva
+     * correspondiente al salir las unidades vendidas.
      */
     private void removeStockForOrder(Long productId, String variantId, Integer quantity) {
         int remaining = quantity;
         List<InventoryDocument> rows = inventoryMongoService.findByProductId(productId).stream()
                 .filter(i -> Objects.equals(i.getVariantId(), variantId))
-                .sorted(Comparator.comparing(InventoryDocument::getQuantity).reversed())
+                .sorted(Comparator
+                        .comparingInt(InventoryDocument::getReservedQuantity).reversed()
+                        .thenComparing(Comparator.comparingInt(InventoryDocument::getQuantity).reversed()))
                 .toList();
 
         for (InventoryDocument row : rows) {
