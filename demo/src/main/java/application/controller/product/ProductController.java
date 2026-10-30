@@ -71,11 +71,17 @@ public class ProductController {
     @GetMapping("/my-products")
     @PreAuthorize("hasRole('SELLER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<List<ProductResponse>> getMyProducts(Authentication authentication) {
-        String email = authentication.getName();
-        SellerEntity seller = sellerService.findByUserEntityEmail(email)
-                .orElseThrow(() -> new RuntimeException("Seller profile not found"));
-        
-        List<ProductEntity> products = productService.findBySellerId(seller.getId());
+        List<ProductEntity> products;
+        if (authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRATOR"))) {
+            // El administrador consulta todos los productos; no tiene perfil de vendedor.
+            products = productService.findAllProducts();
+        } else {
+            String email = authentication.getName();
+            SellerEntity seller = sellerService.findByUserEntityEmail(email)
+                    .orElseThrow(() -> new RuntimeException("Seller profile not found"));
+            products = productService.findBySellerId(seller.getId());
+        }
         return ResponseEntity.ok(products.stream().map(this::toResponse).collect(Collectors.toList()));
     }
 
@@ -111,14 +117,9 @@ public class ProductController {
         
         return productService.findById(id)
                 .map(existing -> {
-                    // Verify ownership
-                    String email = authentication.getName();
-                    SellerEntity seller = sellerService.findByUserEntityEmail(email)
-                            .orElseThrow(() -> new RuntimeException("Seller profile not found"));
-                    
-                    if (!existing.getSeller().getId().equals(seller.getId()) && 
-                        !authentication.getAuthorities().stream()
-                            .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRATOR"))) {
+                    // Autorizacion: el administrador puede actuar sobre cualquier
+                    // producto sin requerir un perfil de vendedor propio.
+                    if (!isOwnerOrAdmin(existing, authentication)) {
                         return ResponseEntity.status(403).<ProductResponse>build();
                     }
 
@@ -134,13 +135,9 @@ public class ProductController {
     public ResponseEntity<Void> deleteProduct(@PathVariable Long id, Authentication authentication) {
         return productService.findById(id)
                 .map(existing -> {
-                    String email = authentication.getName();
-                    SellerEntity seller = sellerService.findByUserEntityEmail(email)
-                            .orElseThrow(() -> new RuntimeException("Seller profile not found"));
-                    
-                    if (!existing.getSeller().getId().equals(seller.getId()) && 
-                        !authentication.getAuthorities().stream()
-                            .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRATOR"))) {
+                    // Autorizacion: el administrador puede actuar sobre cualquier
+                    // producto sin requerir un perfil de vendedor propio.
+                    if (!isOwnerOrAdmin(existing, authentication)) {
                         return ResponseEntity.status(403).<Void>build();
                     }
 

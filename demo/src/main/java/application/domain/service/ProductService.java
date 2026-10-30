@@ -31,11 +31,17 @@ public class ProductService {
     }
 
     public Optional<ProductEntity> findById(Long id) {
-        return productRepository.findById(id);
+        // Carga junto con el vendedor: los controladores exponen datos del
+        // vendedor despues de cerrar la transaccion (open-in-view=false).
+        return productRepository.findByIdWithSeller(id);
     }
 
     public List<ProductEntity> findBySellerId(Long sellerId) {
         return productRepository.findBySellerId(sellerId);
+    }
+
+    public List<ProductEntity> findAllProducts() {
+        return productRepository.findAll();
     }
 
     public List<ProductEntity> findByStatus(ProductStatus status) {
@@ -123,17 +129,6 @@ public class ProductService {
             throw new BusinessRuleException("Un producto descontinuado no puede actualizarse");
         }
         validateRequiredData(product);
-        if (productRepository.existsBySku(product.getSku())
-                && existing.getSku() != null && !existing.getSku().equals(product.getSku())) {
-            throw new BusinessRuleException("Ya existe un producto con el SKU: " + product.getSku());
-        }
-        existing.setName(product.getName());
-        existing.setDescription(product.getDescription());
-        existing.setBasePrice(product.getBasePrice());
-        existing.setSku(product.getSku());
-        existing.setCategory(product.getCategory());
-        existing.setBrand(product.getBrand());
-        existing.setImages(product.getImages());
         return productRepository.save(existing);
     }
 
