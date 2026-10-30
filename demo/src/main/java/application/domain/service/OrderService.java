@@ -8,6 +8,7 @@ import application.domain.enums.InventoryStatus;
 import application.domain.enums.OrderStatus;
 import application.domain.enums.ProductStatus;
 import application.domain.enums.UserStatus;
+import application.domain.ports.NotificationPort;
 import application.domain.ports.PaymentPort;
 import application.domain.valueObjects.Money;
 import application.exception.BusinessRuleException;
@@ -18,6 +19,7 @@ import application.persistence.mongodb.document.InventoryDocument;
 import application.persistence.mysql.entity.AddressEmbeddable;
 import application.persistence.mysql.entity.BuyerEntity;
 import application.persistence.mysql.entity.DigitalProductEntity;
+import application.persistence.mysql.entity.LogisticsOperatorEntity;
 import application.persistence.mysql.entity.OrderEntity;
 import application.persistence.mysql.entity.OrderItemEntity;
 import application.persistence.mysql.entity.PhysicalProductEntity;
@@ -25,6 +27,8 @@ import application.persistence.mysql.entity.ProductEntity;
 import application.persistence.mysql.entity.ProductVariantEntity;
 import application.persistence.mysql.entity.ShipmentEntity;
 import application.persistence.mysql.repository.BuyerRepository;
+import application.persistence.mysql.repository.LogisticsOperatorRepository;
+import application.persistence.mysql.repository.WarehouseRepository;
 import application.persistence.mysql.repository.OrderRepository;
 import application.persistence.mysql.repository.OrderItemRepository;
 import application.persistence.mysql.repository.ProductRepository;
@@ -86,6 +90,15 @@ public class OrderService {
 
     @Autowired
     private PaymentPort paymentPort;
+
+    @Autowired
+    private LogisticsOperatorRepository logisticsOperatorRepository;
+
+    @Autowired
+    private WarehouseRepository warehouseRepository;
+
+    @Autowired
+    private NotificationPort notificationPort;
 
     // ==================== Domain Services (SDD - Order Services) ====================
 
@@ -304,6 +317,115 @@ public class OrderService {
         return orderRepository.save(order);
     }
 
+    // ==================== Domain Services (SDD - Shipment/Billing Services) ====================
+
+    /**
+     * CreateShipment (Actor: LogisticsOperator / System).
+     * Crea un envio para un pedido fisico pagado que necesita despacho.
+     *
+     * Reglas de negocio:
+     * - El envio se asocia a un pedido valido que incluya productos fisicos
+     *   (los digitales se entregan digitalmente y no generan envio).
+     * - El pedido debe tener el pago confirmado.
+     * - El envio debe tener un destino valido (direccion de envio del pedido).
+     * - No se crean envios duplicados para pedidos con envio en curso.
+     */
+    public ShipmentEntity createShipment(Long orderId, Long logisticsOperatorId, Long warehouseId,
+                                         String carrier, Integer estimatedDays) {
+        OrderEntity order = getOrderOrThrow(orderId);
+
+        if (!requiresPhysicalDispatch(order)) {
+            throw new BusinessRuleException(
+                    "El pedido no incluye productos fisicos; no requiere envio de mercancia");
+        }
+        if (order.getStatus() != OrderStatus.PAID) {
+            throw new BusinessRuleException(
+                    "Solo se crea envio para un pedido con el pago confirmado (estado actual: " + order.getStatus() + ")");
+        }
+        if (order.getShippingAddress() == null || isBlank(order.getShippingAddress().getStreet())
+                || isBlank(order.getShippingAddress().getCity()) || isBlank(order.getShippingAddress().getCountry())) {
+            throw new BusinessRuleException(
+                    "El envio debe tener un destino valido; el pedido no registra direccion de envio completa");
+        }
+
+        boolean shipmentInCourse = shipmentRepository.findByOrderId(orderId).stream()
+                .anyMatch(s -> !"DELIVERED".equals(s.getStatus()));
+        if (shipmentInCourse) {
+            throw new BusinessRuleException(
+                    "El pedido ya tiene un envio en curso; no se puede crear otro");
+        }
+
+        ShipmentEntity shipment = new ShipmentEntity();
+        shipment.setTrackingNumber(generateTrackingNumber());
+        shipment.setOrder(order);
+        if (logisticsOperatorId != null) {
+            shipment.setLogisticsOperator(logisticsOperatorRepository.findById(logisticsOperatorId)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Logistics operator not found: " + logisticsOperatorId)));
+        }
+        if (warehouseId != null) {
+            shipment.setWarehouse(warehouseRepository.findById(warehouseId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Warehouse not found: " + warehouseId)));
+        }
+        shipment.setCarrier(carrier);
+        shipment.setStatus("CREATED");
+        if (estimatedDays != null && estimatedDays > 0) {
+            shipment.setEstimatedDeliveryDate(LocalDateTime.now().plusDays(estimatedDays));
+        }
+        shipment.setDestinationAddress(order.getShippingAddress());
+
+        ShipmentEntity saved = shipmentRepository.save(shipment);
+        notificationPort.notifyOrderEvent(orderId, "Envio creado: " + saved.getTrackingNumber());
+        return saved;
+    }
+
+    /**
+     * GenerateInvoice (Actor: System).
+     * Genera la informacion de facturacion correspondiente a un pedido con
+     * pago confirmado. La factura es un RESULTADO asociado al pedido (SDD):
+     * los importes corresponden exactamente a los registrados en el pedido y
+     * no se genera si el pago esta pendiente o fallido.
+     */
+    public application.domain.dto.billing.InvoiceResponse generateInvoice(Long orderId) {
+        OrderEntity order = getOrderOrThrow(orderId);
+
+        if (order.getPaidAt() == null) {
+            throw new BusinessRuleException(
+                    "No se genera factura sin pago confirmado (estado actual: " + order.getStatus() + ")");
+        }
+
+        List<application.domain.dto.billing.InvoiceResponse.ItemLine> lines = order.getItems().stream()
+                .map(item -> application.domain.dto.billing.InvoiceResponse.ItemLine.builder()
+                        .productId(item.getProduct().getId())
+                        .productName(item.getProduct().getName())
+                        .variantName(item.getVariant() != null ? item.getVariant().getVariantName() : null)
+                        .quantity(item.getQuantity())
+                        .unitPrice(item.getUnitPrice())
+                        .totalPrice(item.getTotalPrice())
+                        .build())
+                .toList();
+
+        return application.domain.dto.billing.InvoiceResponse.builder()
+                .invoiceNumber("INV-" + order.getOrderNumber())
+                .orderId(order.getId())
+                .orderNumber(order.getOrderNumber())
+                .orderStatus(order.getStatus().name())
+                .buyerId(order.getBuyer().getId())
+                .buyerName(order.getBuyer().getFullName())
+                .buyerEmail(order.getBuyer().getEmail())
+                .subtotal(order.getSubtotal())
+                .taxAmount(order.getTaxAmount())
+                .shippingCost(order.getShippingCost())
+                .discountAmount(order.getDiscountAmount())
+                .totalAmount(order.getTotalAmount())
+                .currency(order.getCurrency())
+                .items(lines)
+                .orderCreatedAt(order.getCreatedAt())
+                .paidAt(order.getPaidAt())
+                .issuedAt(LocalDateTime.now())
+                .build();
+    }
+
     // ==================== Persistence / queries ====================
 
     public OrderEntity save(OrderEntity order) {
@@ -460,6 +582,10 @@ public class OrderService {
         return product instanceof PhysicalProductEntity;
     }
 
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
     private boolean requiresPhysicalDispatch(OrderEntity order) {
         return order.getItems() != null && order.getItems().stream()
                 .anyMatch(i -> requiresPhysical(i.getProduct()));
@@ -483,5 +609,10 @@ public class OrderService {
                     + "-" + String.format("%04d", ThreadLocalRandom.current().nextInt(10000));
         } while (orderRepository.existsByOrderNumber(candidate));
         return candidate;
+    }
+
+    private String generateTrackingNumber() {
+        return "SHP-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+                + "-" + String.format("%06d", ThreadLocalRandom.current().nextInt(1000000));
     }
 }

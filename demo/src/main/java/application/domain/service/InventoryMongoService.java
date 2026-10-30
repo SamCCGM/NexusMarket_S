@@ -171,6 +171,10 @@ public class InventoryMongoService {
         return inventoryRepository.findByWarehouseId(warehouseId);
     }
 
+    public List<InventoryDocument> findByAll() {
+        return inventoryRepository.findAll();
+    }
+
     public List<InventoryDocument> findByProductId(Long productId) {
         return inventoryRepository.findByProductId(productId);
     }

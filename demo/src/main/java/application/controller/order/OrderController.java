@@ -141,6 +141,16 @@ public class OrderController {
         return ResponseEntity.ok(toResponse(orderService.finalizeOrder(id)));
     }
 
+    /**
+     * GenerateInvoice (SDD): genera la informacion de facturacion del pedido;
+     * solo con pago confirmado. La factura es un resultado asociado al pedido.
+     */
+    @GetMapping("/{id}/invoice")
+    @PreAuthorize("hasRole('BUYER') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<application.domain.dto.billing.InvoiceResponse> generateInvoice(@PathVariable Long id) {
+        return ResponseEntity.ok(orderService.generateInvoice(id));
+    }
+
     private OrderResponse toResponse(OrderEntity entity) {
         return OrderResponse.builder()
                 .id(entity.getId())
