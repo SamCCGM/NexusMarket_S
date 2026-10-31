@@ -33,5 +33,7 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
     @Query("SELECT o FROM OrderEntity o WHERE o.createdAt BETWEEN :startDate AND :endDate")
     List<OrderEntity> findByCreatedAtBetween(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
+    List<OrderEntity> findByStatusAndDeliveredAtBefore(OrderStatus status, LocalDateTime cutoff);
+
     boolean existsByOrderNumber(String orderNumber);
 }

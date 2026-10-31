@@ -347,7 +347,9 @@ public class OrderService {
         }
 
         order.setStatus(OrderStatus.FINALIZED);
-        return orderRepository.save(order);
+        OrderEntity saved = orderRepository.save(order);
+        notificationPort.notifyOrderEvent(orderId, "Pedido finalizado: " + saved.getOrderNumber());
+        return saved;
     }
 
     // ==================== Domain Services (SDD - Shipment/Billing Services) ====================
