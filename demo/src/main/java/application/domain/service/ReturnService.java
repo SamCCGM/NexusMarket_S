@@ -35,6 +35,7 @@ public class ReturnService {
 
     private static final String STATUS_REQUESTED = "REQUESTED";
     private static final String STATUS_APPROVED = "APPROVED";
+    private static final String STATUS_RECEIVED = "RECEIVED";
 
     @Autowired
     private ReturnRepository returnRepository;
@@ -50,6 +51,9 @@ public class ReturnService {
 
     @Autowired
     private NotificationPort notificationPort;
+
+    @Autowired
+    private InventoryMongoService inventoryMongoService;
 
     /**
      * RequestReturn (Actor: Buyer).
@@ -146,6 +150,56 @@ public class ReturnService {
         ReturnEntity saved = returnRepository.save(returnEntity);
         notificationPort.notifyOrderEvent(saved.getOrder().getId(),
                 "Devolucion aprobada: " + saved.getReturnNumber());
+
+        return toResponse(saved, saved.getOrderItem());
+    }
+
+    /**
+     * ReceiveReturnUnits (Actor: LogisticsOperator / Administrator).
+     * Registra la recepcion y revision de las unidades devueltas.
+     *
+     * Reglas de negocio (SDD):
+     * - El reembolso y la reincorporacion de unidades son operaciones distintas:
+     *   el inventario solo se actualiza cuando las unidades fueron recibidas
+     *   y revisadas como aptas para volver a venderse.
+     * - Solo aplica a devoluciones APPROVED y unidades de productos fisicos.
+     * - Reincorpora las unidades mediante ReturnStock (RETURN) en la bodega
+     *   indicada y deja trazabilidad (estado RECEIVED + receivedAt).
+     */
+    public ReturnResponse receiveReturnUnits(Long returnId, Long warehouseId) {
+        ReturnEntity returnEntity = returnRepository.findById(returnId)
+                .orElseThrow(() -> new ResourceNotFoundException("Return not found: " + returnId));
+
+        if (!STATUS_APPROVED.equals(returnEntity.getStatus())) {
+            throw new BusinessRuleException(
+                    "Solo una devolucion APPROVED puede recibir unidades (estado actual: "
+                            + returnEntity.getStatus() + ")");
+        }
+        if (warehouseId == null) {
+            throw new BusinessRuleException(
+                    "Debe indicar la bodega que recibe las unidades devueltas");
+        }
+
+        OrderItemEntity orderItem = returnEntity.getOrderItem();
+        if (!(orderItem.getProduct() instanceof
+                application.persistence.mysql.entity.PhysicalProductEntity)) {
+            throw new BusinessRuleException(
+                    "Las unidades de un producto digital no se reincorporan al inventario");
+        }
+        if (orderItem.getVariant() != null) {
+            throw new BusinessRuleException(
+                    "Las unidades devueltas de una variante se reincorporan segun su variante; "
+                            + "registre el retorno por la variante correspondiente");
+        }
+
+        inventoryMongoService.returnStock(warehouseId, orderItem.getProduct().getId(), null,
+                returnEntity.getQuantity());
+
+        returnEntity.setStatus(STATUS_RECEIVED);
+        returnEntity.setReceivedAt(LocalDateTime.now());
+        ReturnEntity saved = returnRepository.save(returnEntity);
+        notificationPort.notifyOrderEvent(saved.getOrder().getId(),
+                "Unidades devueltas recibidas y reincorporadas: " + saved.getReturnNumber());
 
         return toResponse(saved, saved.getOrderItem());
     }

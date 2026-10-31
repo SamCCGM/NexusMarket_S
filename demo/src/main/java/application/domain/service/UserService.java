@@ -23,6 +23,9 @@ public class UserService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private application.domain.ports.NotificationPort notificationPort;
+
     public UserEntity registerUser(UserEntity user) {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         return userRepository.save(user);
@@ -114,7 +117,12 @@ public class UserService {
         }
 
         user.setStatus(UserStatus.BLOCKED);
-        return userRepository.save(user);
+        UserEntity saved = userRepository.save(user);
+        notificationPort.sendNotification(
+                saved.getEmail(),
+                "Su cuenta fue bloqueada",
+                "Su cuenta fue bloqueada por un administrador. Historicamente sus pedidos se conservan.");
+        return saved;
     }
 
     /**
@@ -133,6 +141,11 @@ public class UserService {
         }
 
         user.setStatus(UserStatus.ACTIVE);
-        return userRepository.save(user);
+        UserEntity saved = userRepository.save(user);
+        notificationPort.sendNotification(
+                saved.getEmail(),
+                "Su cuenta fue reactivada",
+                "Su cuenta fue reactivada: ya puede operar nuevamente en el Marketplace.");
+        return saved;
     }
 }

@@ -51,6 +51,19 @@ public class ReturnController {
         return ResponseEntity.ok(returnService.approveReturn(id, resolutionNotes));
     }
 
+    /**
+     * ReceiveReturnUnits (SDD): registra la recepcion y revision de las
+     * unidades devueltas aptas (reincorporacion al inventario con trazabilidad).
+     */
+    @PostMapping("/{id}/receive")
+    @PreAuthorize("hasRole('LOGISTICS_OPERATOR') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<ReturnResponse> receiveReturnUnits(
+            @PathVariable Long id,
+            @RequestParam Long warehouseId) {
+
+        return ResponseEntity.ok(returnService.receiveReturnUnits(id, warehouseId));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('BUYER') or hasRole('SELLER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<ReturnResponse> getById(@PathVariable Long id) {

@@ -56,4 +56,11 @@ public class ReturnEntity {
 
     @Column(name = "processed_at")
     private LocalDateTime processedAt;
+
+    /**
+     * Registro de trazabilidad: cuando las unidades fueron recibidas, revisadas
+     * y declaradas aptas, se reincorporan al inventario mediante ReturnStock.
+     */
+    @Column(name = "received_at")
+    private LocalDateTime receivedAt;
 }

@@ -98,6 +98,9 @@ public class OrderService {
     private WarehouseRepository warehouseRepository;
 
     @Autowired
+    private application.domain.ports.ShipmentPort shipmentPort;
+
+    @Autowired
     private NotificationPort notificationPort;
 
     // ==================== Domain Services (SDD - Order Services) ====================
@@ -403,6 +406,16 @@ public class OrderService {
             shipment.setEstimatedDeliveryDate(LocalDateTime.now().plusDays(estimatedDays));
         }
         shipment.setDestinationAddress(order.getShippingAddress());
+
+        // Outputs Ports (SDD): la solicitud de despacho externo pasa por el
+        // puerto; se conserva el identificador externo del envio.
+        shipment.setExternalShipmentId(shipmentPort.createShipment(
+                orderId,
+                application.domain.valueObjects.Address.builder()
+                        .value(order.getShippingAddress().getStreet() + ", "
+                                + order.getShippingAddress().getCity() + ", "
+                                + order.getShippingAddress().getCountry())
+                        .build()));
 
         ShipmentEntity saved = shipmentRepository.save(shipment);
         notificationPort.notifyOrderEvent(orderId, "Envio creado: " + saved.getTrackingNumber());

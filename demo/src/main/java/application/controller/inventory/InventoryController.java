@@ -129,6 +129,18 @@ public class InventoryController {
                         request.getVariantId(), request.getQuantity())));
     }
 
+    /**
+     * ReleaseStock: libera una reserva previa (pago fallido o pedido
+     * cancelado, complemento de ReserveStock).
+     */
+    @PostMapping("/stock/release")
+    @PreAuthorize("hasRole('LOGISTICS_OPERATOR') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<InventoryResponse> releaseStock(@RequestBody @Valid StockMovementRequest request) {
+        return ResponseEntity.ok(toResponse(
+                inventoryService.releaseStock(request.getWarehouseId(), request.getProductId(),
+                        request.getVariantId(), request.getQuantity())));
+    }
+
     private InventoryResponse toResponse(InventoryDocument doc) {
         return InventoryResponse.builder()
                 .id(doc.getId())

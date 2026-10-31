@@ -23,6 +23,13 @@ public class ShipmentEntity {
     @Column(name = "tracking_number", unique = true, length = 100)
     private String trackingNumber;
 
+    /**
+     * Identificador del envio en el proveedor externo de despacho
+     * (resultado de la llamada al ShipmentPort / Outputs Ports.md).
+     */
+    @Column(name = "external_shipment_id")
+    private Long externalShipmentId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
     private OrderEntity order;
