@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 public class ShipmentResponse {
     private Long id;
     private String trackingNumber;
+    private Long externalShipmentId;
     private Long orderId;
     private String orderNumber;
     private String orderStatus;

@@ -74,6 +74,7 @@ public class ShipmentController {
         return ShipmentResponse.builder()
                 .id(entity.getId())
                 .trackingNumber(entity.getTrackingNumber())
+                .externalShipmentId(entity.getExternalShipmentId())
                 .orderId(entity.getOrder().getId())
                 .orderNumber(entity.getOrder().getOrderNumber())
                 .orderStatus(entity.getOrder().getStatus() != null ? entity.getOrder().getStatus().name() : null)

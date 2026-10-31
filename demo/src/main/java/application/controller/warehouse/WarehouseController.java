@@ -53,10 +53,15 @@ public class WarehouseController {
     @GetMapping("/my-warehouses")
     @PreAuthorize("hasRole('SELLER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<List<WarehouseResponse>> getMyWarehouses(Authentication authentication) {
-        String email = authentication.getName();
-        SellerEntity seller = sellerService.findByUserEntityEmail(email)
-                .orElseThrow(() -> new RuntimeException("Seller profile not found"));
-        
+        SellerEntity seller = sellerService.findByUserEntityEmail(authentication.getName()).orElse(null);
+        if (seller == null) {
+            // Un administrador no tiene perfil de vendedor: no hay bodegas propias.
+            if (isAdmin(authentication)) {
+                return ResponseEntity.ok(List.of());
+            }
+            return ResponseEntity.status(403).build();
+        }
+
         List<WarehouseEntity> warehouses = warehouseService.findBySellerId(seller.getId());
         return ResponseEntity.ok(warehouses.stream().map(this::toResponse).collect(Collectors.toList()));
     }
@@ -66,10 +71,18 @@ public class WarehouseController {
     public ResponseEntity<WarehouseResponse> createWarehouse(
             @RequestBody @Valid WarehouseRequest request,
             Authentication authentication) {
-        
-        String email = authentication.getName();
-        SellerEntity seller = sellerService.findByUserEntityEmail(email)
-                .orElseThrow(() -> new RuntimeException("Seller profile not found"));
+
+        boolean admin = isAdmin(authentication);
+        SellerEntity seller = sellerService.findByUserEntityEmail(authentication.getName()).orElse(null);
+
+        // Una bodega de tipo SELLER siempre pertenece a un vendedor; un
+        // administrador solo puede registrar bodegas MARKETPLACE.
+        if (seller == null && !admin) {
+            return ResponseEntity.status(403).build();
+        }
+        if (seller == null && "SELLER".equalsIgnoreCase(request.getType())) {
+            return ResponseEntity.badRequest().build();
+        }
 
         // RegisterWarehouse (SDD): valida ubicacion y tipo (SELLER requiere vendedor)
         WarehouseEntity warehouse = toEntity(request, seller);
@@ -86,13 +99,12 @@ public class WarehouseController {
         
         return warehouseService.findById(id)
                 .map(existing -> {
-                    String email = authentication.getName();
-                    SellerEntity seller = sellerService.findByUserEntityEmail(email)
-                            .orElseThrow(() -> new RuntimeException("Seller profile not found"));
+                    boolean admin = isAdmin(authentication);
+                    SellerEntity seller = sellerService
+                            .findByUserEntityEmail(authentication.getName()).orElse(null);
 
-                    if (!existing.getSeller().getId().equals(seller.getId()) &&
-                        !authentication.getAuthorities().stream()
-                            .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRATOR"))) {
+                    if (!admin && (seller == null || existing.getSeller() == null
+                            || !existing.getSeller().getId().equals(seller.getId()))) {
                         return ResponseEntity.status(403).<WarehouseResponse>build();
                     }
 
@@ -108,13 +120,12 @@ public class WarehouseController {
     public ResponseEntity<Void> deleteWarehouse(@PathVariable Long id, Authentication authentication) {
         return warehouseService.findById(id)
                 .map(existing -> {
-                    String email = authentication.getName();
-                    SellerEntity seller = sellerService.findByUserEntityEmail(email)
-                            .orElseThrow(() -> new RuntimeException("Seller profile not found"));
-                    
-                    if (!existing.getSeller().getId().equals(seller.getId()) && 
-                        !authentication.getAuthorities().stream()
-                            .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRATOR"))) {
+                    boolean admin = isAdmin(authentication);
+                    SellerEntity seller = sellerService
+                            .findByUserEntityEmail(authentication.getName()).orElse(null);
+
+                    if (!admin && (seller == null || existing.getSeller() == null
+                            || !existing.getSeller().getId().equals(seller.getId()))) {
                         return ResponseEntity.status(403).<Void>build();
                     }
 
@@ -122,6 +133,11 @@ public class WarehouseController {
                     return ResponseEntity.noContent().<Void>build();
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    private boolean isAdmin(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRATOR"));
     }
 
     private WarehouseResponse toResponse(WarehouseEntity entity) {

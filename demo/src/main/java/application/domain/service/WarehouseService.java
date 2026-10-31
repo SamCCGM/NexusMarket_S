@@ -116,7 +116,7 @@ public class WarehouseService {
     }
 
     public Optional<WarehouseEntity> findById(Long id) {
-        return warehouseRepository.findById(id);
+        return warehouseRepository.findByIdWithSeller(id);
     }
 
     public List<WarehouseEntity> findBySellerId(Long sellerId) {

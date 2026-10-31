@@ -12,9 +12,11 @@ import java.util.Optional;
 @Repository
 public interface SellerRepository extends JpaRepository<SellerEntity, Long> {
 
-    Optional<SellerEntity> findByUserEntityId(Long userId);
+    // Herencia JOINED: el id del vendedor es el mismo id del usuario.
+    @Query("SELECT s FROM SellerEntity s WHERE s.id = :userId")
+    Optional<SellerEntity> findByUserEntityId(@Param("userId") Long userId);
 
-    @Query("SELECT s FROM SellerEntity s JOIN s.userEntity u WHERE u.email = :email")
+    @Query("SELECT s FROM SellerEntity s WHERE s.email = :email")
     Optional<SellerEntity> findByUserEntityEmail(@Param("email") String email);
 
     List<SellerEntity> findByCompanyNameContainingIgnoreCase(String companyName);

@@ -19,8 +19,10 @@ public class MongoConfig extends AbstractMongoClientConfiguration {
 
     @Override
     protected String getDatabaseName() {
-        // Extract database name from URI or use default
-        return "nexusmarket_mongo";
+        // La base de datos se toma de la propia URI de conexion.
+        ConnectionString connectionString = new ConnectionString(mongoUri);
+        String database = connectionString.getDatabase();
+        return database != null && !database.isBlank() ? database : "nexusmarket_mongo";
     }
 
     @Override

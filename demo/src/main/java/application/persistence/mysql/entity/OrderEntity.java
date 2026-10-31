@@ -53,9 +53,27 @@ public class OrderEntity {
     private String currency = "USD";
 
     @Embedded
+    @AttributeOverrides({
+            @AttributeOverride(name = "street", column = @Column(name = "shipping_street")),
+            @AttributeOverride(name = "city", column = @Column(name = "shipping_city")),
+            @AttributeOverride(name = "state", column = @Column(name = "shipping_state")),
+            @AttributeOverride(name = "country", column = @Column(name = "shipping_country")),
+            @AttributeOverride(name = "postalCode", column = @Column(name = "shipping_postal_code")),
+            @AttributeOverride(name = "phoneNumber", column = @Column(name = "shipping_phone_number")),
+            @AttributeOverride(name = "isDefault", column = @Column(name = "shipping_is_default"))
+    })
     private AddressEmbeddable shippingAddress;
 
     @Embedded
+    @AttributeOverrides({
+            @AttributeOverride(name = "street", column = @Column(name = "billing_street")),
+            @AttributeOverride(name = "city", column = @Column(name = "billing_city")),
+            @AttributeOverride(name = "state", column = @Column(name = "billing_state")),
+            @AttributeOverride(name = "country", column = @Column(name = "billing_country")),
+            @AttributeOverride(name = "postalCode", column = @Column(name = "billing_postal_code")),
+            @AttributeOverride(name = "phoneNumber", column = @Column(name = "billing_phone_number")),
+            @AttributeOverride(name = "isDefault", column = @Column(name = "billing_is_default"))
+    })
     private AddressEmbeddable billingAddress;
 
     @Column(name = "notes", columnDefinition = "TEXT")

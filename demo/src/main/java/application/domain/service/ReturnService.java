@@ -8,6 +8,7 @@ import application.exception.BusinessRuleException;
 import application.exception.ResourceNotFoundException;
 import application.persistence.mysql.entity.OrderEntity;
 import application.persistence.mysql.entity.OrderItemEntity;
+import application.persistence.mysql.entity.ProductEntity;
 import application.persistence.mysql.entity.ReturnEntity;
 import application.persistence.mysql.repository.OrderItemRepository;
 import application.persistence.mysql.repository.OrderRepository;
@@ -189,7 +190,10 @@ public class ReturnService {
         int suitable = received - damaged;
 
         OrderItemEntity orderItem = returnEntity.getOrderItem();
-        if (!(orderItem.getProduct() instanceof
+        // El producto puede llegar como proxy de Hibernate: se resuelve el
+        // tipo real antes de decidir si las unidades vuelven al inventario.
+        ProductEntity product = (ProductEntity) org.hibernate.Hibernate.unproxy(orderItem.getProduct());
+        if (!(product instanceof
                 application.persistence.mysql.entity.PhysicalProductEntity)) {
             throw new BusinessRuleException(
                     "Las unidades de un producto digital no se reincorporan al inventario");

@@ -537,7 +537,7 @@ public class OrderService {
     }
 
     public Optional<OrderEntity> findById(Long id) {
-        return orderRepository.findById(id);
+        return orderRepository.findByIdWithDetails(id);
     }
 
     public Optional<OrderEntity> findByOrderNumber(String orderNumber) {
@@ -592,7 +592,7 @@ public class OrderService {
     // ==================== Internal ====================
 
     private OrderEntity getOrderOrThrow(Long orderId) {
-        return orderRepository.findById(orderId)
+        return orderRepository.findByIdWithDetails(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + orderId));
     }
 
@@ -774,7 +774,9 @@ public class OrderService {
     }
 
     private boolean requiresPhysical(ProductEntity product) {
-        return product instanceof PhysicalProductEntity;
+        // El producto puede ser un proxy de Hibernate: se resuelve su tipo real.
+        ProductEntity real = (ProductEntity) org.hibernate.Hibernate.unproxy(product);
+        return real instanceof PhysicalProductEntity;
     }
 
     private boolean isBlank(String value) {

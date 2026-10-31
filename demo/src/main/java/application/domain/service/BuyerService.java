@@ -34,6 +34,9 @@ public class BuyerService {
             throw new BusinessRuleException("La contrasena es obligatoria para registrar un comprador");
         }
         buyer.setBuyerStatus(BuyerStatus.ACTIVE);
+        if (buyer.getStatus() == null) {
+            buyer.setStatus(application.domain.enums.UserStatus.ACTIVE);
+        }
         if (buyer.getRole() == null) {
             buyer.setRole(application.domain.enums.UserRole.BUYER);
         }
@@ -78,7 +81,7 @@ public class BuyerService {
         return buyerRepository.findAll();
     }
 
-    public List<BuyerEntity> findByBuyerStatus(String status) {
+    public List<BuyerEntity> findByBuyerStatus(BuyerStatus status) {
         return buyerRepository.findByBuyerStatus(status);
     }
 

@@ -171,6 +171,18 @@ public class OrderController {
     }
 
     /**
+     * DeleteOrder: solo un administrador puede eliminar un pedido y solo si
+     * no tiene efectos (CANCELLED). Los pedidos pagados/despachados/entregados
+     * conservan su trazabilidad.
+     */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    public ResponseEntity<Void> deleteOrder(@PathVariable Long id) {
+        orderService.deleteById(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
      * GenerateInvoice (SDD): genera la informacion de facturacion del pedido;
      * solo con pago confirmado. La factura es un resultado asociado al pedido.
      */

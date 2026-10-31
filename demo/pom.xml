@@ -111,6 +111,18 @@
 			<artifactId>mongodb</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- Smoke end-to-end sin infraestructura externa: H2 (modo MySQL) + Mongo in-memory -->
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>de.bwaldvogel</groupId>
+			<artifactId>mongo-java-server</artifactId>
+			<version>1.44.0</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>

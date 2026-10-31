@@ -20,33 +20,35 @@ import java.util.Optional;
 @Repository
 public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
 
-    @EntityGraph(attributePaths = "seller")
+    @EntityGraph(attributePaths = {"seller", "variants"})
     List<ProductEntity> findBySellerId(Long sellerId);
 
-    @EntityGraph(attributePaths = "seller")
+    @EntityGraph(attributePaths = {"seller", "variants"})
     List<ProductEntity> findByStatus(ProductStatus status);
 
-    @EntityGraph(attributePaths = "seller")
+    @EntityGraph(attributePaths = {"seller", "variants"})
     Page<ProductEntity> findByStatus(ProductStatus status, Pageable pageable);
 
-    @EntityGraph(attributePaths = "seller")
+    @EntityGraph(attributePaths = {"seller", "variants"})
     List<ProductEntity> findByCategory(String category);
 
-    @EntityGraph(attributePaths = "seller")
+    @EntityGraph(attributePaths = {"seller", "variants"})
     List<ProductEntity> findBySellerIdAndStatus(Long sellerId, ProductStatus status);
 
-    @EntityGraph(attributePaths = "seller")
-    @Query("SELECT p FROM ProductEntity p WHERE p.name ILIKE %:keyword% OR p.description ILIKE %:keyword%")
+    @EntityGraph(attributePaths = {"seller", "variants"})
+    @Query("SELECT p FROM ProductEntity p WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+            "OR LOWER(p.description) LIKE LOWER(CONCAT('%', :keyword, '%'))")
     List<ProductEntity> searchByKeyword(@Param("keyword") String keyword);
 
-    @EntityGraph(attributePaths = "seller")
+    @EntityGraph(attributePaths = {"seller", "variants"})
     @Query("SELECT p FROM ProductEntity p WHERE p.sku = :sku")
     Optional<ProductEntity> findBySku(@Param("sku") String sku);
 
     boolean existsBySku(String sku);
 
-    // Carga el producto junto con su vendedor en una sola consulta (evita
+    // Carga el producto junto con su vendedor y variantes (evita
     // LazyInitializationException con open-in-view=false).
-    @Query("SELECT p FROM ProductEntity p JOIN FETCH p.seller s WHERE p.id = :id")
+    @EntityGraph(attributePaths = {"seller", "variants"})
+    @Query("SELECT p FROM ProductEntity p WHERE p.id = :id")
     Optional<ProductEntity> findByIdWithSeller(@Param("id") Long id);
 }

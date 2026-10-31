@@ -2,6 +2,7 @@ package application.domain.service;
 
 import application.persistence.mysql.entity.ProductEntity;
 import application.persistence.mysql.entity.ProductVariantEntity;
+import application.persistence.mysql.repository.OrderItemRepository;
 import application.persistence.mysql.repository.ProductRepository;
 import application.persistence.mysql.repository.ProductVariantRepository;
 import application.domain.enums.ProductStatus;
@@ -25,6 +26,9 @@ public class ProductService {
 
     @Autowired
     private ProductVariantRepository variantRepository;
+
+    @Autowired
+    private OrderItemRepository orderItemRepository;
 
     public ProductEntity save(ProductEntity product) {
         return productRepository.save(product);
@@ -72,8 +76,18 @@ public class ProductService {
         return productRepository.existsBySku(sku);
     }
 
+    /**
+     * Elimina un producto. Se protege la trazabilidad: un producto que ya
+     * forma parte de algun pedido no puede borrarse (debe descontinuarse).
+     */
     public void deleteById(Long id) {
-        productRepository.deleteById(id);
+        ProductEntity product = productRepository.findByIdWithSeller(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado con id: " + id));
+        if (orderItemRepository.existsByProductId(id)) {
+            throw new BusinessRuleException(
+                    "El producto tiene pedidos asociados: no puede eliminarse, use DiscontinueProduct");
+        }
+        productRepository.delete(product);
     }
 
     /**
@@ -123,12 +137,20 @@ public class ProductService {
      * actualizar sus propios productos (el controlador valida propiedad/admin).
      */
     public ProductEntity updateProduct(ProductEntity product) {
-        ProductEntity existing = productRepository.findById(product.getId())
+        ProductEntity existing = productRepository.findByIdWithSeller(product.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado con id: " + product.getId()));
         if (existing.getStatus() == ProductStatus.DISCONTINUED) {
             throw new BusinessRuleException("Un producto descontinuado no puede actualizarse");
         }
         validateRequiredData(product);
+        existing.setName(product.getName());
+        existing.setDescription(product.getDescription());
+        existing.setBasePrice(product.getBasePrice());
+        existing.setCategory(product.getCategory());
+        existing.setBrand(product.getBrand());
+        existing.setImages(product.getImages());
+        existing.setWeight(product.getWeight());
+        existing.setDimensions(product.getDimensions());
         return productRepository.save(existing);
     }
 
@@ -138,7 +160,7 @@ public class ProductService {
      * disponibilidad: para productos fisicos la disponibilidad depende del inventario.
      */
     public ProductEntity publishProduct(Long productId) {
-        ProductEntity product = productRepository.findById(productId)
+        ProductEntity product = productRepository.findByIdWithSeller(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado con id: " + productId));
         if (product.getStatus() == ProductStatus.DISCONTINUED) {
             throw new BusinessRuleException("Un producto descontinuado no puede publicarse");
@@ -156,7 +178,7 @@ public class ProductService {
      * Un producto suspendido no puede incluirse en nuevas compras.
      */
     public ProductEntity suspendProduct(Long productId) {
-        ProductEntity product = productRepository.findById(productId)
+        ProductEntity product = productRepository.findByIdWithSeller(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado con id: " + productId));
         if (product.getStatus() != ProductStatus.PUBLISHED) {
             throw new BusinessRuleException("Solo un producto publicado puede suspenderse");
@@ -169,7 +191,7 @@ public class ProductService {
      * DiscontinueProduct: retira definitivamente el producto de la plataforma.
      */
     public ProductEntity discontinueProduct(Long productId) {
-        ProductEntity product = productRepository.findById(productId)
+        ProductEntity product = productRepository.findByIdWithSeller(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado con id: " + productId));
         if (product.getStatus() == ProductStatus.DISCONTINUED) {
             throw new BusinessRuleException("El producto ya se encuentra descontinuado");
