@@ -12,6 +12,7 @@ public class InventoryResponse {
     private String variantId;
     private Integer quantity;
     private Integer reservedQuantity;
+    private Integer damagedQuantity;
     private Integer availableQuantity;
     private String status;
     private Boolean lowStock;

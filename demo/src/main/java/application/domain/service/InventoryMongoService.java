@@ -94,9 +94,10 @@ public class InventoryMongoService {
         requirePositive(quantity);
         InventoryDocument inventory = findInventoryOrThrow(warehouseId, productId, variantId);
 
-        if (inventory.getQuantity() < quantity) {
+        int sellable = inventory.getQuantity() - (inventory.getDamagedQuantity() == null ? 0 : inventory.getDamagedQuantity());
+        if (sellable < quantity) {
             throw new BusinessRuleException(
-                    "Insufficient stock to remove. Total: " + inventory.getQuantity()
+                    "Insufficient sellable stock to remove. Sellable: " + sellable
                             + ", Requested: " + quantity);
         }
 
@@ -123,6 +124,45 @@ public class InventoryMongoService {
         InventoryDocument inventory = findInventoryOrThrow(warehouseId, productId, variantId);
         inventory.setQuantity(newQuantity);
         inventory.setReservedQuantity(Math.min(inventory.getReservedQuantity(), newQuantity));
+        int damaged = inventory.getDamagedQuantity() == null ? 0 : inventory.getDamagedQuantity();
+        inventory.setDamagedQuantity(Math.min(damaged, newQuantity - inventory.getReservedQuantity()));
+        return save(inventory);
+    }
+
+    /**
+     * MarkDamaged (Actor: LogisticsOperator).
+     * Declara unidades como dañadas/no aptas para la venta sin retirarlas del
+     * registro: siguen en el total, pero dejan de estar disponibles.
+     *
+     * Reglas de negocio (SDD): las unidades dañadas no pueden considerarse
+     * disponibles ni reservarse; la cantidad dañada nunca puede superar las
+     * existencias no reservadas.
+     */
+    public InventoryDocument markDamaged(Long warehouseId, Long productId, String variantId, Integer quantity) {
+        requirePositive(quantity);
+        InventoryDocument inventory = findInventoryOrThrow(warehouseId, productId, variantId);
+
+        if (inventory.getAvailableQuantity() < quantity) {
+            throw new BusinessRuleException(
+                    "No se pueden declarar mas unidades danadas que las disponibles (disponible: "
+                            + inventory.getAvailableQuantity() + ")");
+        }
+
+        inventory.setDamagedQuantity(
+                (inventory.getDamagedQuantity() == null ? 0 : inventory.getDamagedQuantity()) + quantity);
+        return save(inventory);
+    }
+
+    /**
+     * ReturnStock dañado (RETURN no apto): reincorpora unidades recibidas que
+     * NO pueden volver a venderse; se suman al total y a las dañadas.
+     */
+    public InventoryDocument returnDamagedStock(Long warehouseId, Long productId, String variantId, Integer quantity) {
+        requirePositive(quantity);
+        InventoryDocument inventory = findOrCreate(warehouseId, productId, variantId);
+        inventory.setQuantity(inventory.getQuantity() + quantity);
+        inventory.setDamagedQuantity(
+                (inventory.getDamagedQuantity() == null ? 0 : inventory.getDamagedQuantity()) + quantity);
         return save(inventory);
     }
 

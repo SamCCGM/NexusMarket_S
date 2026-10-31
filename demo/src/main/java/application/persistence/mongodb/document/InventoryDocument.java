@@ -31,6 +31,14 @@ public class InventoryDocument {
 
     private Integer quantity = 0;
     private Integer reservedQuantity = 0;
+
+    /**
+     * Unidades dañadas/no aptas dentro del registro: siguen contabilizadas en
+     * quantity pero no pueden reservarse, venderse ni considerarse disponibles.
+     * Regla del SDD: las unidades dañadas no pueden considerarse disponibles.
+     */
+    private Integer damagedQuantity = 0;
+
     private Integer minStockLevel = 10;
     private Integer maxStockLevel = 1000;
 
@@ -44,7 +52,9 @@ public class InventoryDocument {
     private String lastUpdatedBy;
 
     public Integer getAvailableQuantity() {
-        return quantity - reservedQuantity;
+        int damaged = damagedQuantity == null ? 0 : damagedQuantity;
+        int reserved = reservedQuantity == null ? 0 : reservedQuantity;
+        return Math.max(0, quantity - reserved - damaged);
     }
 
     public boolean isLowStock() {

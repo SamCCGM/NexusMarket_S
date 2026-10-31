@@ -54,14 +54,16 @@ public class ReturnController {
     /**
      * ReceiveReturnUnits (SDD): registra la recepcion y revision de las
      * unidades devueltas aptas (reincorporacion al inventario con trazabilidad).
+     * damagedQuantity (opcional) declara unidades recibidas no aptas para venta.
      */
     @PostMapping("/{id}/receive")
     @PreAuthorize("hasRole('LOGISTICS_OPERATOR') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<ReturnResponse> receiveReturnUnits(
             @PathVariable Long id,
-            @RequestParam Long warehouseId) {
+            @RequestParam Long warehouseId,
+            @RequestParam(required = false, defaultValue = "0") Integer damagedQuantity) {
 
-        return ResponseEntity.ok(returnService.receiveReturnUnits(id, warehouseId));
+        return ResponseEntity.ok(returnService.receiveReturnUnits(id, warehouseId, damagedQuantity));
     }
 
     @GetMapping("/{id}")

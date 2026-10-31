@@ -577,6 +577,15 @@ public class OrderService {
     }
 
     public void deleteById(Long id) {
+        // La factura (y el resto de la trazabilidad) se reconstruye desde el
+        // pedido: solo se borran pedidos cancelados, que no generaron efectos.
+        OrderEntity order = getOrderOrThrow(id);
+        if (order.getStatus() != OrderStatus.CANCELLED) {
+            throw new BusinessRuleException(
+                    "Solo puede eliminarse un pedido CANCELLED; los pedidos con efectos "
+                            + "(pagados, despachados o entregados) conservan su trazabilidad (estado actual: "
+                            + order.getStatus() + ")");
+        }
         orderRepository.deleteById(id);
     }
 

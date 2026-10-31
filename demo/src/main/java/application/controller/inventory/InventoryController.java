@@ -130,6 +130,18 @@ public class InventoryController {
     }
 
     /**
+     * MarkDamaged: declara unidades como dañadas/no aptas para la venta.
+     * Regla SDD: las unidades dañadas no pueden considerarse disponibles.
+     */
+    @PostMapping("/stock/damaged")
+    @PreAuthorize("hasRole('LOGISTICS_OPERATOR') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<InventoryResponse> markDamaged(@RequestBody @Valid StockMovementRequest request) {
+        return ResponseEntity.ok(toResponse(
+                inventoryService.markDamaged(request.getWarehouseId(), request.getProductId(),
+                        request.getVariantId(), request.getQuantity())));
+    }
+
+    /**
      * ReleaseStock: libera una reserva previa (pago fallido o pedido
      * cancelado, complemento de ReserveStock).
      */
@@ -149,6 +161,7 @@ public class InventoryController {
                 .variantId(doc.getVariantId())
                 .quantity(doc.getQuantity())
                 .reservedQuantity(doc.getReservedQuantity())
+                .damagedQuantity(doc.getDamagedQuantity())
                 .availableQuantity(doc.getAvailableQuantity())
                 .status(doc.getStatus() != null ? doc.getStatus().name() : null)
                 .lowStock(doc.isLowStock())

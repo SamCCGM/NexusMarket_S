@@ -166,7 +166,7 @@ public class ReturnService {
      * - Reincorpora las unidades mediante ReturnStock (RETURN) en la bodega
      *   indicada y deja trazabilidad (estado RECEIVED + receivedAt).
      */
-    public ReturnResponse receiveReturnUnits(Long returnId, Long warehouseId) {
+    public ReturnResponse receiveReturnUnits(Long returnId, Long warehouseId, Integer damagedQuantity) {
         ReturnEntity returnEntity = returnRepository.findById(returnId)
                 .orElseThrow(() -> new ResourceNotFoundException("Return not found: " + returnId));
 
@@ -179,6 +179,14 @@ public class ReturnService {
             throw new BusinessRuleException(
                     "Debe indicar la bodega que recibe las unidades devueltas");
         }
+
+        int received = returnEntity.getQuantity() == null ? 0 : returnEntity.getQuantity();
+        int damaged = damagedQuantity == null ? 0 : damagedQuantity;
+        if (damaged < 0 || damaged > received) {
+            throw new BusinessRuleException(
+                    "Las unidades no aptas deben estar entre 0 y la cantidad devuelta (" + received + ")");
+        }
+        int suitable = received - damaged;
 
         OrderItemEntity orderItem = returnEntity.getOrderItem();
         if (!(orderItem.getProduct() instanceof
@@ -193,14 +201,28 @@ public class ReturnService {
                 ? null
                 : String.valueOf(orderItem.getVariant().getId());
 
-        inventoryMongoService.returnStock(warehouseId, orderItem.getProduct().getId(), variantId,
-                returnEntity.getQuantity());
+        // Unidades recibidas y declaradas aptas: vuelven a estar disponibles.
+        if (suitable > 0) {
+            inventoryMongoService.returnStock(warehouseId, orderItem.getProduct().getId(), variantId, suitable);
+        }
+        // Unidades recibidas pero no aptas: se registran como dañadas (no disponibles).
+        if (damaged > 0) {
+            inventoryMongoService.returnDamagedStock(warehouseId, orderItem.getProduct().getId(),
+                    variantId, damaged);
+        }
 
         returnEntity.setStatus(STATUS_RECEIVED);
         returnEntity.setReceivedAt(LocalDateTime.now());
+        if (damaged > 0) {
+            returnEntity.setResolutionNotes(
+                    (returnEntity.getResolutionNotes() == null ? "" : returnEntity.getResolutionNotes() + " | ")
+                            + "Recibidas " + received + " unidades: " + suitable
+                            + " aptas, " + damaged + " no aptas (dadas de baja)");
+        }
         ReturnEntity saved = returnRepository.save(returnEntity);
         notificationPort.notifyOrderEvent(saved.getOrder().getId(),
-                "Unidades devueltas recibidas y reincorporadas: " + saved.getReturnNumber());
+                "Unidades devueltas recibidas: " + saved.getReturnNumber()
+                        + " (" + suitable + " aptas, " + damaged + " no aptas)");
 
         return toResponse(saved, saved.getOrderItem());
     }
