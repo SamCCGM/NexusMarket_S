@@ -186,13 +186,14 @@ public class ReturnService {
             throw new BusinessRuleException(
                     "Las unidades de un producto digital no se reincorporan al inventario");
         }
-        if (orderItem.getVariant() != null) {
-            throw new BusinessRuleException(
-                    "Las unidades devueltas de una variante se reincorporan segun su variante; "
-                            + "registre el retorno por la variante correspondiente");
-        }
 
-        inventoryMongoService.returnStock(warehouseId, orderItem.getProduct().getId(), null,
+        // El reintegro respeta la variante de la linea (el inventario se
+        // administra por bodega + producto + variante).
+        String variantId = orderItem.getVariant() == null
+                ? null
+                : String.valueOf(orderItem.getVariant().getId());
+
+        inventoryMongoService.returnStock(warehouseId, orderItem.getProduct().getId(), variantId,
                 returnEntity.getQuantity());
 
         returnEntity.setStatus(STATUS_RECEIVED);
