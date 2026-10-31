@@ -134,6 +134,9 @@ public class OrderService {
         BuyerEntity buyer = buyerRepository.findById(buyerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Buyer not found: " + buyerId));
 
+        // Un comprador bloqueado no inicia compras (SDD - ProcessPayment/Buyer).
+        assertBuyerCanOperate(buyer);
+
         CartDocument cart = cartMongoService.findByBuyerId(buyerId)
                 .orElseThrow(() -> new BusinessRuleException(
                         "No se puede crear un pedido: el carrito esta vacio o no existe"));
@@ -215,6 +218,9 @@ public class OrderService {
             throw new BusinessRuleException(
                     "Solo un pedido PENDING_PAYMENT puede procesar pago (estado actual: " + order.getStatus() + ")");
         }
+
+        // Un comprador bloqueado no puede confirmar la compra.
+        assertBuyerCanOperate(order.getBuyer());
 
         // Revalidacion de disponibilidad antes de confirmar el pago
         for (OrderItemEntity item : order.getItems()) {
@@ -505,6 +511,18 @@ public class OrderService {
     private OrderEntity getOrderOrThrow(Long orderId) {
         return orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + orderId));
+    }
+
+    /**
+     * El comprador debe estar activo para operar: iniciando compras,
+     * confirmando pagos o usando el carrito (SDD: un comprador bloqueado
+     * no puede iniciar compras).
+     */
+    private void assertBuyerCanOperate(BuyerEntity buyer) {
+        if (buyer == null || buyer.getStatus() != UserStatus.ACTIVE) {
+            throw new BusinessRuleException(
+                    "Un comprador bloqueado no puede realizar compras");
+        }
     }
 
     /**

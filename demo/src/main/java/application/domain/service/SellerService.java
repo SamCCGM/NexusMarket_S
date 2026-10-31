@@ -19,6 +19,9 @@ public class SellerService {
     @Autowired
     private SellerRepository sellerRepository;
 
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
     public SellerEntity save(SellerEntity seller) {
         return sellerRepository.save(seller);
     }
@@ -55,6 +58,8 @@ public class SellerService {
         if (seller.getRole() == null) {
             seller.setRole(application.domain.enums.UserRole.SELLER);
         }
+        // La contrasena se guarda siempre cifrada (login via SecurityConfig).
+        seller.setPassword(passwordEncoder.encode(seller.getPassword()));
         return sellerRepository.save(seller);
     }
 

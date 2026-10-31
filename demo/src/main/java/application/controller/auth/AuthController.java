@@ -55,8 +55,16 @@ public class AuthController {
                 .build());
     }
 
+    /**
+     * Registro publico: SOLO compradores (SDD - Domain Services).
+     * Los vendedores los incorpora un administrador (RegisterSeller) y no
+     * pueden registrarse por si mismos.
+     */
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@RequestBody @Valid RegisterRequest request) {
+        if (request.getRole() == null || !request.getRole().equalsIgnoreCase("BUYER")) {
+            return ResponseEntity.status(403).<AuthResponse>build();
+        }
         if (userRepository.existsByEmail(request.getEmail())) {
             return ResponseEntity.badRequest().build();
         }

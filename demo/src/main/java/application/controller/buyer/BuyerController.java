@@ -1,10 +1,12 @@
 package application.controller.buyer;
 
+import application.domain.dto.buyer.BuyerRegisterRequest;
 import application.domain.dto.buyer.BuyerResponse;
 import application.domain.dto.buyer.BuyerUpdateRequest;
 import application.persistence.mysql.entity.AddressEmbeddable;
 import application.persistence.mysql.entity.BuyerEntity;
 import application.domain.service.BuyerService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,6 +22,26 @@ import java.util.stream.Collectors;
 public class BuyerController {
 
     private final BuyerService buyerService;
+
+    /**
+     * RegisterBuyer (SDD): alta de un comprador. El registro publico ocurre en
+     * POST /api/auth/register (solo compradores); este endpoint permite la
+     * incorporacion directa de compradores por un administrador.
+     */
+    @PostMapping
+    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    public ResponseEntity<BuyerResponse> registerBuyer(@RequestBody @Valid BuyerRegisterRequest request) {
+        if (buyerService.findByUserEntityEmail(request.getEmail()).isPresent()) {
+            return ResponseEntity.badRequest().build();
+        }
+        BuyerEntity buyer = BuyerEntity.builder()
+                .fullName(request.getFullName())
+                .email(request.getEmail())
+                .password(request.getPassword())
+                .phoneNumber(request.getPhoneNumber())
+                .build();
+        return ResponseEntity.ok(toResponse(buyerService.registerBuyer(buyer)));
+    }
 
     @GetMapping
     @PreAuthorize("hasRole('ADMINISTRATOR')")

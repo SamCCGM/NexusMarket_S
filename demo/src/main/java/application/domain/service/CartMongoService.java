@@ -7,7 +7,9 @@ import application.exception.ResourceNotFoundException;
 import application.persistence.mongodb.document.CartDocument;
 import application.persistence.mongodb.document.CartItemDocument;
 import application.persistence.mongodb.repository.CartDocumentRepository;
+import application.persistence.mysql.entity.BuyerEntity;
 import application.persistence.mysql.entity.ProductEntity;
+import application.persistence.mysql.repository.BuyerRepository;
 import application.persistence.mysql.repository.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -33,6 +35,9 @@ public class CartMongoService {
     @Autowired
     private ProductRepository productRepository;
 
+    @Autowired
+    private BuyerRepository buyerRepository;
+
     // ==================== Domain Services (SDD - Cart Services) ====================
 
     /**
@@ -49,6 +54,7 @@ public class CartMongoService {
      * - Agregar al carrito no reserva unidades por sí solo.
      */
     public CartDocument addItem(Long buyerId, CartItemDocument item) {
+        assertActiveBuyer(buyerId);
         validateItemForCart(item);
 
         CartDocument cart = getOrCreateCart(buyerId);
@@ -80,6 +86,7 @@ public class CartMongoService {
      * - Se conservan los demás datos de la línea (precio, nombre, vendedor).
      */
     public CartDocument updateItemQuantity(Long buyerId, String productId, String variantId, Integer quantity) {
+        assertActiveBuyer(buyerId);
         if (quantity == null || quantity <= 0) {
             throw new BusinessRuleException("Quantity must be greater than zero");
         }
@@ -108,6 +115,7 @@ public class CartMongoService {
      *   posteriormente.
      */
     public CartDocument removeItem(Long buyerId, String productId, String variantId) {
+        assertActiveBuyer(buyerId);
         CartDocument cart = cartRepository.findByBuyerId(buyerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart not found for buyer: " + buyerId));
 
@@ -175,6 +183,19 @@ public class CartMongoService {
         if (product.getSeller() == null || product.getSeller().getStatus() != UserStatus.ACTIVE) {
             throw new BusinessRuleException(
                     "The seller of this product cannot participate in the Marketplace");
+        }
+    }
+
+    /**
+     * Un comprador bloqueado no puede iniciar compras ni modificar su carrito.
+     */
+    private void assertActiveBuyer(Long buyerId) {
+        BuyerEntity buyer = buyerRepository.findById(buyerId)
+                .orElseThrow(() -> new BusinessRuleException(
+                        "El comprador del carrito no existe: " + buyerId));
+        if (buyer.getStatus() != UserStatus.ACTIVE) {
+            throw new BusinessRuleException(
+                    "Un comprador bloqueado no puede iniciar compras ni modificar su carrito");
         }
     }
 

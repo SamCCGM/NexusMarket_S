@@ -1,5 +1,6 @@
 package application.controller.seller;
 
+import application.domain.dto.seller.SellerRegisterRequest;
 import application.domain.dto.seller.SellerResponse;
 import application.domain.dto.seller.SellerUpdateRequest;
 import application.persistence.mysql.entity.SellerEntity;
@@ -94,6 +95,27 @@ public class SellerController {
     @PreAuthorize("hasRole('ADMINISTRATOR')")
     public ResponseEntity<SellerResponse> activateSeller(@PathVariable Long id) {
         return ResponseEntity.ok(toResponse(sellerService.activateSeller(id)));
+    }
+
+    /**
+     * RegisterSeller (SDD): incorpora un vendedor. Solo un administrador puede
+     * hacerlo (los vendedores no se registran por si mismos).
+     */
+    @PostMapping
+    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    public ResponseEntity<SellerResponse> registerSeller(@RequestBody @jakarta.validation.Valid SellerRegisterRequest request) {
+        if (sellerService.findByUserEntityEmail(request.getEmail()).isPresent()) {
+            return ResponseEntity.badRequest().build();
+        }
+        SellerEntity seller = SellerEntity.builder()
+                .fullName(request.getFullName())
+                .email(request.getEmail())
+                .password(request.getPassword())
+                .companyName(request.getCompanyName())
+                .taxId(request.getTaxId())
+                .description(request.getDescription())
+                .build();
+        return ResponseEntity.ok(toResponse(sellerService.registerSeller(seller)));
     }
 
     private void applyUpdates(SellerEntity seller, SellerUpdateRequest request) {

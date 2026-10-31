@@ -24,6 +24,25 @@ public class WarehouseService {
     }
 
     /**
+     * Regla del SDD (AddStock): el ingreso de unidades solo se permite a un
+     * registro de inventario de una bodega autorizada. Para un vendedor,
+     * la autorizacion es ser el propietario de la bodega de tipo SELLER.
+     * Se ejecuta dentro de la transaccion para poder leer la relacion.
+     */
+    public WarehouseEntity assertSellerAuthorizedWarehouse(Long warehouseId, Long sellerId) {
+        WarehouseEntity warehouse = warehouseRepository.findById(warehouseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Warehouse not found: " + warehouseId));
+        if (warehouse.getType() != WarehouseType.SELLER
+                || warehouse.getSeller() == null
+                || !warehouse.getSeller().getId().equals(sellerId)) {
+            throw new BusinessRuleException(
+                    "Un vendedor solo puede operar el inventario de su propia bodega (bodega "
+                            + warehouseId + " no autorizada)");
+        }
+        return warehouse;
+    }
+
+    /**
      * RegisterWarehouse (Actor: Administrator).
      * Registra una bodega en el sistema.
      *
