@@ -127,6 +127,23 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("un pedido PENDING_PAYMENT puede cancelarse (expira sin pago)")
+    void cancelFromPendingPayment() {
+        Order order = atStatus(OrderStatus.PENDING_PAYMENT, true);
+        assertTrue(order.canTransitionTo(OrderStatus.CANCELLED));
+        order.transitionTo(OrderStatus.CANCELLED);
+        assertEquals(OrderStatus.CANCELLED, order.getStatus());
+    }
+
+    @Test
+    @DisplayName("un pedido pagado no se cancela (requiere devolucion/reembolso) y CANCELLED es terminal")
+    void cancelledIsTerminal() {
+        assertFalse(atStatus(OrderStatus.PAID, true).canTransitionTo(OrderStatus.CANCELLED));
+        assertFalse(atStatus(OrderStatus.CANCELLED, true).canTransitionTo(OrderStatus.PAID));
+        assertFalse(atStatus(OrderStatus.CANCELLED, true).canTransitionTo(OrderStatus.CANCELLED));
+    }
+
+    @Test
     @DisplayName("lineas de pedido validan producto, cantidad y precio")
     void orderItemValidation() {
         OrderItem item = new OrderItem();

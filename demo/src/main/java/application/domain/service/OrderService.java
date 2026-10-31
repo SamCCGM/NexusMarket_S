@@ -352,6 +352,43 @@ public class OrderService {
         return saved;
     }
 
+    /**
+     * CancelOrder / Expiration (Actor: Buyer / System).
+     * Cancela un pedido que aun no fue pagado y libera la reserva de
+     * inventario hecha por ReserveStock al crear el pedido.
+     *
+     * Reglas de negocio:
+     * - Solo un pedido PENDING_PAYMENT puede cancelarse (uno pagado requiere
+     *   el flujo de devolucion/reembolso, no una cancelacion).
+     * - La cancelacion libera exactamente las unidades reservadas de los
+     *   productos fisicos, sin tocar las existencias totales.
+     * - El pedido pasa al estado terminal CANCELLED (no admite pago posterior).
+     */
+    public OrderEntity cancelOrder(Long orderId, String reason) {
+        OrderEntity order = getOrderOrThrow(orderId);
+
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
+            throw new BusinessRuleException(
+                    "Solo un pedido PENDING_PAYMENT puede cancelarse (estado actual: " + order.getStatus() + ")");
+        }
+
+        for (OrderItemEntity item : order.getItems()) {
+            if (requiresPhysical(item.getProduct())) {
+                releaseStockForOrder(
+                        item.getProduct().getId(),
+                        item.getVariant() == null ? null : String.valueOf(item.getVariant().getId()),
+                        item.getQuantity());
+            }
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
+        OrderEntity saved = orderRepository.save(order);
+        notificationPort.notifyOrderEvent(orderId,
+                "Pedido cancelado" + (reason != null && !reason.isBlank() ? ": " + reason : "")
+                        + " (" + saved.getOrderNumber() + ")");
+        return saved;
+    }
+
     // ==================== Domain Services (SDD - Shipment/Billing Services) ====================
 
     /**
@@ -469,6 +506,28 @@ public class OrderService {
                 .paidAt(order.getPaidAt())
                 .issuedAt(LocalDateTime.now())
                 .build();
+    }
+
+    /**
+     * Expira pedidos PENDING_PAYMENT que superaron la ventana de pago.
+     * Actor: System. Cancela y libera la reserva de inventario asociada.
+     */
+    public int expireUnpaidOrders(int hours) {
+        java.time.LocalDateTime cutoff = java.time.LocalDateTime.now().minusHours(hours);
+        List<OrderEntity> unpaid = orderRepository
+                .findByStatusAndCreatedAtBefore(OrderStatus.PENDING_PAYMENT, cutoff);
+
+        int expired = 0;
+        for (OrderEntity order : unpaid) {
+            try {
+                cancelOrder(order.getId(), "Pedido expirado sin pago");
+                expired++;
+            } catch (RuntimeException e) {
+                notificationPort.notifyOrderEvent(order.getId(),
+                        "No se pudo expirar el pedido: " + e.getMessage());
+            }
+        }
+        return expired;
     }
 
     // ==================== Persistence / queries ====================
@@ -669,6 +728,39 @@ public class OrderService {
         if (remaining > 0) {
             throw new BusinessRuleException(
                     "El inventario ya no cubre la cantidad del pedido (faltan " + remaining + " unidades)");
+        }
+    }
+
+    /**
+     * Libera la reserva hecha por ReserveStock al crear el pedido (pago
+     * fallido/cancelado): consume primero las filas con mayor reserva y nunca
+     * deja la reserva en negativo. Las existencias totales no cambian.
+     */
+    private void releaseStockForOrder(Long productId, String variantId, Integer quantity) {
+        int remaining = quantity;
+        List<InventoryDocument> rows = inventoryMongoService.findByProductId(productId).stream()
+                .filter(i -> Objects.equals(i.getVariantId(), variantId))
+                .filter(i -> i.getReservedQuantity() > 0)
+                .sorted(Comparator.comparingInt(InventoryDocument::getReservedQuantity).reversed())
+                .toList();
+
+        for (InventoryDocument row : rows) {
+            if (remaining <= 0) {
+                break;
+            }
+            int partial = Math.min(remaining, row.getReservedQuantity());
+            if (partial > 0) {
+                inventoryMongoService.releaseStock(row.getWarehouseId(), productId, variantId, partial);
+                remaining -= partial;
+            }
+        }
+
+        if (remaining > 0) {
+            // No es un error fatal: el estado real del inventario pudo cambiar
+            // (p.ej. ajustes del operador) y nunca se libera mas de lo reservado.
+            notificationPort.notifyOrderEvent(null,
+                    "Reserva de inventario incompleta al liberar producto " + productId
+                            + " (faltaron " + remaining + " unidades reservadas)");
         }
     }
 

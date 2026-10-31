@@ -142,6 +142,35 @@ public class OrderController {
     }
 
     /**
+     * CancelOrder: el comprador cancela su pedido aun no pagado y el sistema
+     * libera la reserva de inventario (complemento de ReserveStock). Un pedido
+     * pagado no se cancela: se gestiona con devolucion/reembolso.
+     */
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasRole('BUYER') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<OrderResponse> cancelOrder(
+            @PathVariable Long id,
+            @RequestParam(required = false) String reason,
+            Authentication authentication) {
+
+        OrderEntity order = orderService.findById(id)
+                .orElse(null);
+        if (order == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRATOR"));
+        boolean isOwner = order.getBuyer() != null
+                && authentication.getName().equals(order.getBuyer().getEmail());
+        if (!isAdmin && !isOwner) {
+            return ResponseEntity.status(403).build();
+        }
+
+        return ResponseEntity.ok(toResponse(orderService.cancelOrder(id, reason)));
+    }
+
+    /**
      * GenerateInvoice (SDD): genera la informacion de facturacion del pedido;
      * solo con pago confirmado. La factura es un resultado asociado al pedido.
      */

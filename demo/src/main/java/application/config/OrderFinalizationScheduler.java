@@ -43,6 +43,27 @@ public class OrderFinalizationScheduler {
     @Value("${nexusmarket.order-finalization-enabled:true}")
     private boolean enabled;
 
+    @Value("${nexusmarket.order-expiration-hours:24}")
+    private long expirationHours;
+
+    /**
+     * OrderExpiration (Actor: System).
+     * Cancela los pedidos PENDING_PAYMENT que superaron la ventana de pago y
+     * libera la reserva de inventario asociada (evita stock bloqueado por
+     * carritos/pedidos abandonados).
+     */
+    @Scheduled(fixedDelayString = "${nexusmarket.order-expiration-scheduler-ms:3600000}",
+            initialDelayString = "${nexusmarket.order-expiration-initial-ms:120000}")
+    public void autoExpireUnpaidOrders() {
+        if (!enabled) {
+            return;
+        }
+        int expired = orderService.expireUnpaidOrders((int) expirationHours);
+        if (expired > 0) {
+            log.info("OrderExpiration automatico: {} pedidos cancelados por falta de pago", expired);
+        }
+    }
+
     /** Corre cada hora (configurable en application.properties). */
     @Scheduled(fixedDelayString = "${nexusmarket.order-finalization-scheduler-ms:3600000}",
             initialDelayString = "${nexusmarket.order-finalization-initial-ms:60000}")

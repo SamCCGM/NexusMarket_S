@@ -35,5 +35,7 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
 
     List<OrderEntity> findByStatusAndDeliveredAtBefore(OrderStatus status, LocalDateTime cutoff);
 
+    List<OrderEntity> findByStatusAndCreatedAtBefore(OrderStatus status, LocalDateTime cutoff);
+
     boolean existsByOrderNumber(String orderNumber);
 }

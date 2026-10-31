@@ -38,13 +38,14 @@ public class Order {
             return false;
         }
         return switch (status) {
-            case PENDING_PAYMENT -> target == OrderStatus.PAID;
+            case PENDING_PAYMENT -> target == OrderStatus.PAID || target == OrderStatus.CANCELLED;
             case PAID -> requiresPhysicalDispatch()
                     ? target == OrderStatus.DISPATCHED
                     : target == OrderStatus.DELIVERED;
             case DISPATCHED -> target == OrderStatus.DELIVERED;
             case DELIVERED -> target == OrderStatus.FINALIZED;
             case FINALIZED -> false;
+            case CANCELLED -> false;
         };
     }
 
