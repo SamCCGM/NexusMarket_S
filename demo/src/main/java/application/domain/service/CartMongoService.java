@@ -85,7 +85,7 @@ public class CartMongoService {
      *   RemoveItemFromCart).
      * - Se conservan los demás datos de la línea (precio, nombre, vendedor).
      */
-    public CartDocument updateItemQuantity(Long buyerId, String productId, String variantId, Integer quantity) {
+    public CartDocument updateItemQuantity(Long buyerId, Long productId, Long variantId, Integer quantity) {
         assertActiveBuyer(buyerId);
         if (quantity == null || quantity <= 0) {
             throw new BusinessRuleException("Quantity must be greater than zero");
@@ -114,7 +114,7 @@ public class CartMongoService {
      * - Los productos eliminados no forman parte del pedido que se cree
      *   posteriormente.
      */
-    public CartDocument removeItem(Long buyerId, String productId, String variantId) {
+    public CartDocument removeItem(Long buyerId, Long productId, Long variantId) {
         assertActiveBuyer(buyerId);
         CartDocument cart = cartRepository.findByBuyerId(buyerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart not found for buyer: " + buyerId));
@@ -171,7 +171,10 @@ public class CartMongoService {
             throw new BusinessRuleException("Quantity must be greater than zero");
         }
 
-        Long productId = parseProductId(item.getProductId());
+        if (item.getProductId() == null) {
+            throw new BusinessRuleException("Product id is required");
+        }
+        Long productId = item.getProductId();
         ProductEntity product = productRepository.findByIdWithSeller(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + item.getProductId()));
 
@@ -198,15 +201,5 @@ public class CartMongoService {
                     "Un comprador bloqueado no puede iniciar compras ni modificar su carrito");
         }
     }
-
-    private Long parseProductId(String productId) {
-        if (productId == null || productId.isBlank()) {
-            throw new BusinessRuleException("Product id is required");
-        }
-        try {
-            return Long.parseLong(productId);
-        } catch (NumberFormatException e) {
-            throw new BusinessRuleException("Invalid product id: " + productId);
-        }
-    }
 }
+

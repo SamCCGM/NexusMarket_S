@@ -4,17 +4,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.bwaldvogel.mongo.MongoServer;
 import de.bwaldvogel.mongo.backend.memory.MemoryBackend;
-import application.domain.enums.BuyerStatus;
 import application.domain.enums.UserRole;
 import application.domain.enums.UserStatus;
-import application.domain.service.ProductService;
 import application.persistence.mysql.entity.AdministratorEntity;
 import application.persistence.mysql.entity.BuyerEntity;
-import application.persistence.mysql.entity.DigitalProductEntity;
 import application.persistence.mysql.entity.LogisticsOperatorEntity;
 import application.persistence.mysql.entity.SellerEntity;
 import application.persistence.mysql.repository.AdministratorRepository;
-import application.persistence.mysql.repository.BuyerRepository;
 import application.persistence.mysql.repository.LogisticsOperatorRepository;
 import application.persistence.mysql.repository.SellerRepository;
 import org.junit.jupiter.api.BeforeAll;
@@ -40,7 +36,6 @@ import org.springframework.test.context.DynamicPropertySource;
 
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
-import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -108,13 +103,7 @@ class MarketplaceSmokeE2ETest {
     private SellerRepository sellerRepository;
 
     @Autowired
-    private BuyerRepository buyerRepository;
-
-    @Autowired
     private LogisticsOperatorRepository logisticsOperatorRepository;
-
-    @Autowired
-    private ProductService productService;
 
     // Estado compartido entre las fases ordenadas del smoke
     private String buyerToken;
@@ -122,7 +111,6 @@ class MarketplaceSmokeE2ETest {
     private String adminToken;
     private String logisticsToken;
     private Long buyerId;
-    private Long sellerId;
     private Long warehouseId;
     private Long productId;
     private Long digitalProductId;
@@ -154,7 +142,6 @@ class MarketplaceSmokeE2ETest {
                 .rating(4.5)
                 .totalSales(0L)
                 .build());
-        sellerId = seller.getId();
 
         logisticsOperatorRepository.save(LogisticsOperatorEntity.builder()
                 .fullName("Smoke Logistics")
@@ -377,18 +364,34 @@ class MarketplaceSmokeE2ETest {
     @Order(6)
     @DisplayName("Pedido 100% virtual: pago confirmado -> DELIVERED inmediato (sin DISPATCHED)")
     void digitalPurchaseFlow() {
-        DigitalProductEntity digital = new DigitalProductEntity();
-        digital.setName("Ebook Smoke");
-        digital.setDescription("Producto digital de prueba");
-        digital.setBasePrice(new BigDecimal("25.00"));
-        digital.setSku("SMOKE-DIG-001");
-        digital.setCategory("Pruebas");
-        digital.setDownloadUrl("https://example.com/ebook.zip");
-        digital.setSeller(sellerRepository.findById(sellerId).orElseThrow());
+        // Alta de producto DIGITAL por la API (producto virtual del SDD)
+        ResponseEntity<JsonNode> created = post("/api/products", sellerToken, Map.of(
+                "name", "Ebook Smoke",
+                "description", "Producto digital de prueba",
+                "basePrice", 25.00,
+                "sku", "SMOKE-DIG-001",
+                "category", "Pruebas",
+                "productType", "DIGITAL",
+                "downloadUrl", "https://example.com/ebook.zip",
+                "fileFormat", "ZIP"));
+        assertEquals(HttpStatus.OK, created.getStatusCode(), body(created));
+        digitalProductId = created.getBody().get("id").asLong();
+        assertEquals("DigitalProduct", created.getBody().get("productType").asText());
+        assertEquals("https://example.com/ebook.zip",
+                created.getBody().get("downloadUrl").asText());
 
-        DigitalProductEntity registered = (DigitalProductEntity) productService.registerProduct(digital);
-        digitalProductId = registered.getId();
-        productService.publishProduct(digitalProductId);
+        ResponseEntity<JsonNode> published = post(
+                "/api/products/" + digitalProductId + "/publish", sellerToken, null);
+        assertEquals(HttpStatus.OK, published.getStatusCode(), body(published));
+
+        // Un producto digital sin archivo descargable no puede registrarse
+        assertEquals(HttpStatus.CONFLICT, post("/api/products", sellerToken, Map.of(
+                "name", "Digital sin archivo",
+                "description", "Producto digital invalido",
+                "basePrice", 10.00,
+                "sku", "SMOKE-DIG-INVALID",
+                "category", "Pruebas",
+                "productType", "DIGITAL")).getStatusCode());
 
         ResponseEntity<JsonNode> cart = post("/api/cart/items", buyerToken, Map.of(
                 "productId", String.valueOf(digitalProductId),
@@ -539,3 +542,4 @@ class MarketplaceSmokeE2ETest {
         return "status=" + response.getStatusCode() + " body=" + response.getBody();
     }
 }
+

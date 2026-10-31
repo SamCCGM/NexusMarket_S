@@ -14,7 +14,7 @@ public interface InventoryDocumentRepository extends MongoRepository<InventoryDo
 
     List<InventoryDocument> findByProductId(Long productId);
 
-    Optional<InventoryDocument> findByWarehouseIdAndProductIdAndVariantId(Long warehouseId, Long productId, String variantId);
+    Optional<InventoryDocument> findByWarehouseIdAndProductIdAndVariantId(Long warehouseId, Long productId, Long variantId);
 
     List<InventoryDocument> findByWarehouseIdAndProductId(Long warehouseId, Long productId);
 

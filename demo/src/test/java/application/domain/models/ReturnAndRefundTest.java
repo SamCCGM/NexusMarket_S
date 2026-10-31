@@ -91,4 +91,36 @@ class ReturnAndRefundTest {
         assertDoesNotThrow(refund::assertCanBeProcessed);
         assertEquals("COMPLETED", refund.getStatus());
     }
+
+    @Test
+    @DisplayName("Recibir unidades exige APPROVED y deja la devolucion en RECEIVED")
+    void receiveRequiresApproved() throws ReflectiveOperationException {
+        Return r = atDeliveredOrder();
+        r.assertValidRequest();
+        assertThrows(BusinessRuleException.class, r::receive);
+
+        r.approve();
+        r.receive();
+        assertEquals("RECEIVED", r.getStatus());
+        assertNotNull(r.getReceivedAt());
+        assertThrows(BusinessRuleException.class, r::receive);
+    }
+
+    @Test
+    @DisplayName("la recepcion no impide reembolsar: son operaciones independientes")
+    void refundAfterReceive() throws ReflectiveOperationException {
+        Return r = atDeliveredOrder();
+        r.assertValidRequest();
+        r.approve();
+        r.receive();
+
+        Refund refund = new Refund();
+        refund.setReturnRequest(r);
+        OrderItem item = r.getOrderItem();
+        item.setUnitPrice(new application.domain.valueObjects.Money(new java.math.BigDecimal("5.00"), "USD"));
+        refund.setAmount(item.getUnitPrice().multiply(r.getQuantity()));
+
+        assertDoesNotThrow(refund::assertCanBeProcessed);
+        assertEquals("COMPLETED", refund.getStatus());
+    }
 }

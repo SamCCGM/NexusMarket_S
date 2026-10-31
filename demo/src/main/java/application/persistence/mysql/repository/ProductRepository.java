@@ -51,4 +51,8 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
     @EntityGraph(attributePaths = {"seller", "variants"})
     @Query("SELECT p FROM ProductEntity p WHERE p.id = :id")
     Optional<ProductEntity> findByIdWithSeller(@Param("id") Long id);
+
+    @Override
+    @EntityGraph(attributePaths = {"seller", "variants"})
+    List<ProductEntity> findAll();
 }

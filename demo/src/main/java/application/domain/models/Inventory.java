@@ -20,10 +20,12 @@ public class Inventory {
     private PhysicalProduct product;
     private int quantity;
     private int reservedQuantity;
+    /** Unidades recibidas/revisadas que no son aptas para volver a venderse. */
+    private int damagedQuantity;
     private InventoryStatus status;
 
     public int getAvailableQuantity() {
-        return quantity - reservedQuantity;
+        return quantity - reservedQuantity - damagedQuantity;
     }
 
     public boolean isLowStock(int threshold) {
@@ -80,6 +82,19 @@ public class Inventory {
         quantity += amount;
     }
 
+    /**
+     * MarkDamaged: registra unidades no aptas para la venta. Dejan de estar
+     * disponibles pero siguen formando parte del total fisico registrado.
+     */
+    public void markDamaged(int amount) {
+        assertPositive(amount);
+        if (amount > getAvailableQuantity()) {
+            throw new application.exception.BusinessRuleException(
+                    "No puede marcarse como danada una cantidad superior a la disponible");
+        }
+        damagedQuantity += amount;
+    }
+
     /** AdjustStock (ADJUSTMENT): ajusta a la cantidad verificada. */
     public void adjustTo(int verifiedQuantity) {
         if (verifiedQuantity < 0) {
@@ -87,5 +102,6 @@ public class Inventory {
         }
         quantity = verifiedQuantity;
         reservedQuantity = Math.min(reservedQuantity, verifiedQuantity);
+        damagedQuantity = Math.min(damagedQuantity, verifiedQuantity - reservedQuantity);
     }
 }

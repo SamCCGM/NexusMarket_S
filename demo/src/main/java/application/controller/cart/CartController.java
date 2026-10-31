@@ -59,8 +59,8 @@ public class CartController {
 
     @PutMapping("/items/{productId}")
     public ResponseEntity<CartResponse> updateItemQuantity(
-            @PathVariable String productId,
-            @RequestParam(required = false) String variantId,
+            @PathVariable Long productId,
+            @RequestParam(required = false) Long variantId,
             @RequestParam Integer quantity,
             Authentication authentication) {
         
@@ -71,8 +71,8 @@ public class CartController {
 
     @DeleteMapping("/items/{productId}")
     public ResponseEntity<CartResponse> removeItem(
-            @PathVariable String productId,
-            @RequestParam(required = false) String variantId,
+            @PathVariable Long productId,
+            @RequestParam(required = false) Long variantId,
             Authentication authentication) {
         
         Long buyerId = getBuyerIdFromAuth(authentication);

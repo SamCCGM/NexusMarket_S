@@ -201,9 +201,9 @@ public class ReturnService {
 
         // El reintegro respeta la variante de la linea (el inventario se
         // administra por bodega + producto + variante).
-        String variantId = orderItem.getVariant() == null
+        Long variantId = orderItem.getVariant() == null
                 ? null
-                : String.valueOf(orderItem.getVariant().getId());
+                : orderItem.getVariant().getId();
 
         // Unidades recibidas y declaradas aptas: vuelven a estar disponibles.
         if (suitable > 0) {
@@ -278,3 +278,5 @@ public class ReturnService {
         return candidate;
     }
 }
+
+

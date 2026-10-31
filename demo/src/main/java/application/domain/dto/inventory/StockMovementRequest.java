@@ -15,6 +15,7 @@ public class StockMovementRequest {
     private Long warehouseId;
     @NotNull
     private Long productId;
-    private String variantId;
+    private Long variantId;
     private Integer quantity;
 }
+

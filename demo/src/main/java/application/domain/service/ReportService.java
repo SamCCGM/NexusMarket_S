@@ -84,6 +84,8 @@ public class ReportService {
 
         long paidOrders = orders.stream()
                 .filter(o -> o.getPaidAt() != null).count();
+        long cancelledOrders = orders.stream()
+                .filter(o -> o.getStatus() == application.domain.enums.OrderStatus.CANCELLED).count();
         BigDecimal totalRevenue = orders.stream()
                 .filter(o -> o.getPaidAt() != null && o.getTotalAmount() != null)
                 .map(OrderEntity::getTotalAmount)
@@ -98,6 +100,10 @@ public class ReportService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         long lowStock = inventory.stream().filter(InventoryDocument::isLowStock).count();
+        long damagedStockItems = inventory.stream()
+                .filter(i -> i.getDamagedQuantity() > 0).count();
+        long totalDamagedUnits = inventory.stream()
+                .mapToLong(InventoryDocument::getDamagedQuantity).sum();
 
         return AdminReportResponse.builder()
                 .generatedAt(LocalDateTime.now())
@@ -112,6 +118,7 @@ public class ReportService {
                 .totalOrders((long) orders.size())
                 .ordersByStatus(ordersByStatus)
                 .paidOrders(paidOrders)
+                .cancelledOrders(cancelledOrders)
                 .totalRevenue(totalRevenue)
                 .shipmentsByStatus(shipmentsByStatus)
                 .pendingShipments(pendingShipments)
@@ -119,11 +126,15 @@ public class ReportService {
                         .filter(r -> "REQUESTED".equals(r.getStatus())).count())
                 .approvedReturns(returns.stream()
                         .filter(r -> "APPROVED".equals(r.getStatus())).count())
+                .receivedReturns(returns.stream()
+                        .filter(r -> "RECEIVED".equals(r.getStatus())).count())
                 .completedRefunds(refunds.stream()
                         .filter(r -> "COMPLETED".equals(r.getStatus())).count())
                 .totalRefunded(totalRefunded)
                 .lowStockItems(lowStock)
                 .totalInventoryRecords((long) inventory.size())
+                .damagedStockItems(damagedStockItems)
+                .totalDamagedUnits(totalDamagedUnits)
                 .build();
     }
 

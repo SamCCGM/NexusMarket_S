@@ -19,6 +19,9 @@ public class WarehouseService {
     @Autowired
     private WarehouseRepository warehouseRepository;
 
+    @Autowired
+    private InventoryMongoService inventoryMongoService;
+
     public WarehouseEntity save(WarehouseEntity warehouse) {
         return warehouseRepository.save(warehouse);
     }
@@ -139,7 +142,15 @@ public class WarehouseService {
         return warehouseRepository.findAll();
     }
 
+    /**
+     * DeleteWarehouse: una bodega con registros de inventario no se elimina,
+     * para no dejar existencias huerfanas; en ese caso debe desactivarse.
+     */
     public void deleteById(Long id) {
+        if (!inventoryMongoService.findByWarehouseId(id).isEmpty()) {
+            throw new BusinessRuleException(
+                    "La bodega tiene registros de inventario asociados: no puede eliminarse, desactivela");
+        }
         warehouseRepository.deleteById(id);
     }
 }

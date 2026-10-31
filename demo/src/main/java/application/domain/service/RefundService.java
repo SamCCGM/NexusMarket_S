@@ -54,7 +54,11 @@ public class RefundService {
         ReturnEntity returnEntity = returnRepository.findById(returnId)
                 .orElseThrow(() -> new ResourceNotFoundException("Return not found: " + returnId));
 
-        if (!"APPROVED".equals(returnEntity.getStatus())) {
+        // La aprobacion habilita el reembolso; la recepcion de unidades es
+        // independiente, de modo que una devolucion ya RECEIVED tambien puede
+        // reembolsarse (el inventario se actualiza aparte con ReturnStock).
+        if (!"APPROVED".equals(returnEntity.getStatus())
+                && !"RECEIVED".equals(returnEntity.getStatus())) {
             throw new BusinessRuleException(
                     "Solo las devoluciones APROBADAS pueden reembolsarse (estado actual: " + returnEntity.getStatus() + ")");
         }

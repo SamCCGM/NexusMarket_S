@@ -43,5 +43,15 @@ public class ProductRequest {
 
     private String dimensions; // JSON
 
+    /** PHYSICAL (por defecto) o DIGITAL. */
+    private String productType;
+
+    // Datos propios de los productos digitales
+    private String downloadUrl;
+    private Long fileSizeMb;
+    private String fileFormat;
+    private Boolean licenseKeyRequired;
+    private Integer maxDownloads;
+
     private List<ProductVariantRequest> variants;
 }

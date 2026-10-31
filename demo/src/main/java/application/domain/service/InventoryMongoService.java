@@ -43,7 +43,7 @@ public class InventoryMongoService {
      * - Crea el registro de inventario si aún no existe para esa
      *   bodega/producto/variante.
      */
-    public InventoryDocument addStock(Long warehouseId, Long productId, String variantId, Integer quantity) {
+    public InventoryDocument addStock(Long warehouseId, Long productId, Long variantId, Integer quantity) {
         requirePositive(quantity);
         InventoryDocument inventory = findOrCreate(warehouseId, productId, variantId);
         inventory.setQuantity(inventory.getQuantity() + quantity);
@@ -63,7 +63,7 @@ public class InventoryMongoService {
      * - La disponibilidad debe validarse de nuevo al crear el pedido y antes
      *   de confirmar el pago (agregar al carrito no reserva por sí solo).
      */
-    public InventoryDocument reserveStock(Long warehouseId, Long productId, String variantId, Integer quantity) {
+    public InventoryDocument reserveStock(Long warehouseId, Long productId, Long variantId, Integer quantity) {
         requirePositive(quantity);
         InventoryDocument inventory = findInventoryOrThrow(warehouseId, productId, variantId);
 
@@ -90,7 +90,7 @@ public class InventoryMongoService {
      * - No se puede retirar más de la cantidad total registrada (nunca negativa).
      * - Libera la reserva correspondiente al salir las unidades vendidas.
      */
-    public InventoryDocument removeStock(Long warehouseId, Long productId, String variantId, Integer quantity) {
+    public InventoryDocument removeStock(Long warehouseId, Long productId, Long variantId, Integer quantity) {
         requirePositive(quantity);
         InventoryDocument inventory = findInventoryOrThrow(warehouseId, productId, variantId);
 
@@ -116,7 +116,7 @@ public class InventoryMongoService {
      * - Se ajusta a la cantidad verificada (no a un delta).
      * - La reserva se limita al total para no dejar el disponible en negativo.
      */
-    public InventoryDocument adjustStock(Long warehouseId, Long productId, String variantId, Integer newQuantity) {
+    public InventoryDocument adjustStock(Long warehouseId, Long productId, Long variantId, Integer newQuantity) {
         if (newQuantity == null || newQuantity < 0) {
             throw new BusinessRuleException("Adjusted quantity cannot be negative");
         }
@@ -138,7 +138,7 @@ public class InventoryMongoService {
      * disponibles ni reservarse; la cantidad dañada nunca puede superar las
      * existencias no reservadas.
      */
-    public InventoryDocument markDamaged(Long warehouseId, Long productId, String variantId, Integer quantity) {
+    public InventoryDocument markDamaged(Long warehouseId, Long productId, Long variantId, Integer quantity) {
         requirePositive(quantity);
         InventoryDocument inventory = findInventoryOrThrow(warehouseId, productId, variantId);
 
@@ -157,7 +157,7 @@ public class InventoryMongoService {
      * ReturnStock dañado (RETURN no apto): reincorpora unidades recibidas que
      * NO pueden volver a venderse; se suman al total y a las dañadas.
      */
-    public InventoryDocument returnDamagedStock(Long warehouseId, Long productId, String variantId, Integer quantity) {
+    public InventoryDocument returnDamagedStock(Long warehouseId, Long productId, Long variantId, Integer quantity) {
         requirePositive(quantity);
         InventoryDocument inventory = findOrCreate(warehouseId, productId, variantId);
         inventory.setQuantity(inventory.getQuantity() + quantity);
@@ -178,7 +178,7 @@ public class InventoryMongoService {
      * - La aprobación de una devolución no implica que las unidades regresen
      *   automáticamente: primero deben recibirse y revisarse.
      */
-    public InventoryDocument returnStock(Long warehouseId, Long productId, String variantId, Integer quantity) {
+    public InventoryDocument returnStock(Long warehouseId, Long productId, Long variantId, Integer quantity) {
         requirePositive(quantity);
         InventoryDocument inventory = findOrCreate(warehouseId, productId, variantId);
         inventory.setQuantity(inventory.getQuantity() + quantity);
@@ -189,7 +189,7 @@ public class InventoryMongoService {
      * Libera una reserva previa (complemento de ReserveStock), por ejemplo
      * cuando un pedido se cancela o su pago falla.
      */
-    public InventoryDocument releaseStock(Long warehouseId, Long productId, String variantId, Integer quantity) {
+    public InventoryDocument releaseStock(Long warehouseId, Long productId, Long variantId, Integer quantity) {
         requirePositive(quantity);
         InventoryDocument inventory = findInventoryOrThrow(warehouseId, productId, variantId);
         inventory.setReservedQuantity(Math.max(0, inventory.getReservedQuantity() - quantity));
@@ -219,7 +219,7 @@ public class InventoryMongoService {
         return inventoryRepository.findByProductId(productId);
     }
 
-    public Optional<InventoryDocument> findByWarehouseIdAndProductIdAndVariantId(Long warehouseId, Long productId, String variantId) {
+    public Optional<InventoryDocument> findByWarehouseIdAndProductIdAndVariantId(Long warehouseId, Long productId, Long variantId) {
         return inventoryRepository.findByWarehouseIdAndProductIdAndVariantId(warehouseId, productId, variantId);
     }
 
@@ -237,14 +237,14 @@ public class InventoryMongoService {
 
     // ==================== Internal ====================
 
-    private InventoryDocument findInventoryOrThrow(Long warehouseId, Long productId, String variantId) {
+    private InventoryDocument findInventoryOrThrow(Long warehouseId, Long productId, Long variantId) {
         return inventoryRepository
                 .findByWarehouseIdAndProductIdAndVariantId(warehouseId, productId, variantId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Inventory not found for warehouse: " + warehouseId + ", product: " + productId));
     }
 
-    private InventoryDocument findOrCreate(Long warehouseId, Long productId, String variantId) {
+    private InventoryDocument findOrCreate(Long warehouseId, Long productId, Long variantId) {
         return inventoryRepository
                 .findByWarehouseIdAndProductIdAndVariantId(warehouseId, productId, variantId)
                 .orElseGet(() -> {
@@ -265,3 +265,4 @@ public class InventoryMongoService {
         }
     }
 }
+

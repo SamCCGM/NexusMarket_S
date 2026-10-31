@@ -27,7 +27,7 @@ public class InventoryDocument {
     @Indexed
     private Long productId;
 
-    private String variantId;
+    private Long variantId;
 
     private Integer quantity = 0;
     private Integer reservedQuantity = 0;

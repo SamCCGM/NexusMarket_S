@@ -21,11 +21,12 @@ class InventoryTest {
     }
 
     @Test
-    @DisplayName("availableQuantity = quantity - reserved")
+    @DisplayName("availableQuantity = quantity - reserved - damaged")
     void availableQuantity() {
         Inventory inv = inventory(50, InventoryStatus.AVAILABLE);
         inv.reserve(10);
-        assertEquals(40, inv.getAvailableQuantity());
+        inv.markDamaged(5);
+        assertEquals(35, inv.getAvailableQuantity());
         assertEquals(50, inv.getQuantity());
     }
 
@@ -105,5 +106,37 @@ class InventoryTest {
         Inventory inv = inventory(3, InventoryStatus.AVAILABLE);
         assertTrue(inv.isLowStock(3));
         assertFalse(inv.isLowStock(2));
+    }
+
+    @Test
+    @DisplayName("MarkDamaged retira disponibilidad sin alterar el total fisico")
+    void markDamaged() {
+        Inventory inv = inventory(10, InventoryStatus.AVAILABLE);
+        inv.markDamaged(3);
+        assertEquals(3, inv.getDamagedQuantity());
+        assertEquals(7, inv.getAvailableQuantity());
+        assertEquals(10, inv.getQuantity());
+    }
+
+    @Test
+    @DisplayName("no se pueden marcar como danadas mas unidades que las disponibles")
+    void markDamagedMoreThanAvailableThrows() {
+        Inventory inv = inventory(4, InventoryStatus.AVAILABLE);
+        inv.reserve(3);
+        assertThrows(BusinessRuleException.class, () -> inv.markDamaged(2));
+        assertThrows(BusinessRuleException.class, () -> inv.markDamaged(0));
+    }
+
+    @Test
+    @DisplayName("adjustTo mantiene coherente reserved + damaged")
+    void adjustKeepsDamagedAndReservedCoherent() {
+        Inventory inv = inventory(10, InventoryStatus.AVAILABLE);
+        inv.reserve(4);
+        inv.markDamaged(3);
+        inv.adjustTo(5);
+        assertEquals(5, inv.getQuantity());
+        assertEquals(4, inv.getReservedQuantity());
+        assertEquals(1, inv.getDamagedQuantity());
+        assertTrue(inv.getAvailableQuantity() >= 0);
     }
 }

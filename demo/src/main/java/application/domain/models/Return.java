@@ -21,8 +21,9 @@ public class Return {
     private OrderItem orderItem;
     private String reason;
     private Integer quantity;
-    private String status;  // REQUESTED -> APPROVED
+    private String status;  // REQUESTED -> APPROVED -> RECEIVED
     private LocalDateTime processedAt;
+    private LocalDateTime receivedAt;
 
     /** Reglas: pedido asociado del comprador, motivo descrito y cantidad valida. */
     public void assertValidRequest() {
@@ -61,6 +62,21 @@ public class Return {
 
     /** Solo una devolucion aprobada puede pasar al proceso de reembolso. */
     public boolean canProceedToRefund() {
-        return "APPROVED".equals(status);
+        // La recepcion de unidades es posterior e independiente del reembolso.
+        return "APPROVED".equals(status) || "RECEIVED".equals(status);
+    }
+
+    /**
+     * ReceiveReturn: registra la recepcion y revision de las unidades. Solo
+     * aplica a devoluciones aprobadas; el reintegro efectivo al inventario lo
+     * realiza ReturnStock con las unidades declaradas aptas.
+     */
+    public void receive() {
+        if (!"APPROVED".equals(status)) {
+            throw new application.exception.BusinessRuleException(
+                    "Solo una devolucion APPROVED puede recibirse (estado actual: " + status + ")");
+        }
+        status = "RECEIVED";
+        receivedAt = LocalDateTime.now();
     }
 }

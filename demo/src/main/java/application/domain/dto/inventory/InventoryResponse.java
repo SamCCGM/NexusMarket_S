@@ -9,7 +9,7 @@ public class InventoryResponse {
     private String id;
     private Long warehouseId;
     private Long productId;
-    private String variantId;
+    private Long variantId;
     private Integer quantity;
     private Integer reservedQuantity;
     private Integer damagedQuantity;
@@ -17,3 +17,4 @@ public class InventoryResponse {
     private String status;
     private Boolean lowStock;
 }
+

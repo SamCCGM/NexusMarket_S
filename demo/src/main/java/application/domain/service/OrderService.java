@@ -187,7 +187,7 @@ public class OrderService {
             if (requiresPhysical(item.getProduct())) {
                 reserveStockForOrder(
                         item.getProduct().getId(),
-                        item.getVariant() == null ? null : String.valueOf(item.getVariant().getId()),
+                        item.getVariant() == null ? null : item.getVariant().getId(),
                         item.getQuantity(),
                         item.getProduct().getName());
             }
@@ -229,7 +229,7 @@ public class OrderService {
         for (OrderItemEntity item : order.getItems()) {
             if (requiresPhysical(item.getProduct())) {
                 checkAvailability(item.getProduct().getId(),
-                        item.getVariant() == null ? null : String.valueOf(item.getVariant().getId()),
+                        item.getVariant() == null ? null : item.getVariant().getId(),
                         item.getQuantity(),
                         "No hay unidades disponibles para confirmar el pago del producto "
                                 + item.getProduct().getName());
@@ -295,7 +295,7 @@ public class OrderService {
         for (OrderItemEntity item : order.getItems()) {
             if (requiresPhysical(item.getProduct())) {
                 removeStockForOrder(item.getProduct().getId(),
-                        item.getVariant() == null ? null : String.valueOf(item.getVariant().getId()),
+                        item.getVariant() == null ? null : item.getVariant().getId(),
                         item.getQuantity());
             }
         }
@@ -376,7 +376,7 @@ public class OrderService {
             if (requiresPhysical(item.getProduct())) {
                 releaseStockForOrder(
                         item.getProduct().getId(),
-                        item.getVariant() == null ? null : String.valueOf(item.getVariant().getId()),
+                        item.getVariant() == null ? null : item.getVariant().getId(),
                         item.getQuantity());
             }
         }
@@ -620,7 +620,7 @@ public class OrderService {
                     "Cantidad invalida para el producto del carrito: " + cartItem.getProductId());
         }
 
-        Long productId = parseLong(cartItem.getProductId(), "product id");
+        Long productId = cartItem.getProductId();
         ProductEntity product = productRepository.findByIdWithSeller(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + cartItem.getProductId()));
 
@@ -634,13 +634,13 @@ public class OrderService {
         }
 
         ProductVariantEntity variant = null;
-        if (cartItem.getVariantId() != null && !cartItem.getVariantId().isBlank()) {
-            variant = variantRepository.findById(parseLong(cartItem.getVariantId(), "variant id"))
+        if (cartItem.getVariantId() != null) {
+            variant = variantRepository.findById(cartItem.getVariantId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Variant not found: " + cartItem.getVariantId()));
         }
 
-        String variantIdKey = variant == null ? null : String.valueOf(variant.getId());
+        Long variantIdKey = variant == null ? null : variant.getId();
         if (requiresPhysical(product)) {
             checkAvailability(productId, variantIdKey, cartItem.getQuantity(),
                     "No hay unidades disponibles para el producto: " + product.getName());
@@ -664,7 +664,7 @@ public class OrderService {
      * Verifica que la suma de existencias disponibles (quantity - reserved)
      * en las bodegas cubra la cantidad solicitada. Ignora inventario DAMAGED.
      */
-    private void checkAvailability(Long productId, String variantId, Integer quantity, String message) {
+    private void checkAvailability(Long productId, Long variantId, Integer quantity, String message) {
         boolean available = inventoryMongoService.findByProductId(productId).stream()
                 .filter(i -> Objects.equals(i.getVariantId(), variantId))
                 .filter(i -> i.getStatus() != InventoryStatus.DAMAGED)
@@ -681,7 +681,7 @@ public class OrderService {
      * MISMA asignacion que removeStockForOrder para que el SALE_EXIT consume
      * exactamente la reserva hecha aqui.
      */
-    private void reserveStockForOrder(Long productId, String variantId, Integer quantity, String productName) {
+    private void reserveStockForOrder(Long productId, Long variantId, Integer quantity, String productName) {
         int remaining = quantity;
         List<InventoryDocument> rows = inventoryMongoService.findByProductId(productId).stream()
                 .filter(i -> Objects.equals(i.getVariantId(), variantId))
@@ -714,7 +714,7 @@ public class OrderService {
      * las restantes por cantidad total; removeStock libera la reserva
      * correspondiente al salir las unidades vendidas.
      */
-    private void removeStockForOrder(Long productId, String variantId, Integer quantity) {
+    private void removeStockForOrder(Long productId, Long variantId, Integer quantity) {
         int remaining = quantity;
         List<InventoryDocument> rows = inventoryMongoService.findByProductId(productId).stream()
                 .filter(i -> Objects.equals(i.getVariantId(), variantId))
@@ -745,7 +745,7 @@ public class OrderService {
      * fallido/cancelado): consume primero las filas con mayor reserva y nunca
      * deja la reserva en negativo. Las existencias totales no cambian.
      */
-    private void releaseStockForOrder(Long productId, String variantId, Integer quantity) {
+    private void releaseStockForOrder(Long productId, Long variantId, Integer quantity) {
         int remaining = quantity;
         List<InventoryDocument> rows = inventoryMongoService.findByProductId(productId).stream()
                 .filter(i -> Objects.equals(i.getVariantId(), variantId))
@@ -788,17 +788,6 @@ public class OrderService {
                 .anyMatch(i -> requiresPhysical(i.getProduct()));
     }
 
-    private Long parseLong(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new BusinessRuleException("Invalid " + field + ": (blank)");
-        }
-        try {
-            return Long.parseLong(value);
-        } catch (NumberFormatException e) {
-            throw new BusinessRuleException("Invalid " + field + ": " + value);
-        }
-    }
-
     private String generateOrderNumber() {
         String candidate;
         do {
@@ -813,3 +802,6 @@ public class OrderService {
                 + "-" + String.format("%06d", ThreadLocalRandom.current().nextInt(1000000));
     }
 }
+
+
+

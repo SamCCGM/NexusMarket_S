@@ -13,13 +13,13 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class CartItemDocument {
 
-    private String productId;
-    private String variantId;
+    private Long productId;
+    private Long variantId;
     private String productName;
     private String variantName;
     private String productImageUrl;
     private BigDecimal price;
     private Integer quantity;
-    private String sellerId;
+    private Long sellerId;
     private String sellerName;
 }

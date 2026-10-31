@@ -35,15 +35,15 @@ public class CartResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class CartItemResponse {
-        private String productId;
-        private String variantId;
+        private Long productId;
+        private Long variantId;
         private String productName;
         private String variantName;
         private String productImageUrl;
         private BigDecimal price;
         private Integer quantity;
         private BigDecimal totalPrice;
-        private String sellerId;
+        private Long sellerId;
         private String sellerName;
     }
 }

@@ -225,7 +225,7 @@ public class ProductController {
     }
 
     private ProductResponse toResponse(ProductEntity entity) {
-        return ProductResponse.builder()
+        ProductResponse.ProductResponseBuilder builder = ProductResponse.builder()
                 .id(entity.getId())
                 .name(entity.getName())
                 .description(entity.getDescription())
@@ -239,10 +239,18 @@ public class ProductController {
                 .dimensions(entity.getDimensions())
                 .sellerId(entity.getSeller().getId())
                 .sellerName(entity.getSeller().getCompanyName())
-                .variants(entity.getVariants() != null ? 
+                .variants(entity.getVariants() != null ?
                         entity.getVariants().stream().map(this::toVariantResponse).collect(Collectors.toList()) : null)
-                .productType(entity.getClass().getSimpleName().replace("Entity", ""))
-                .build();
+                .productType(entity.getClass().getSimpleName().replace("Entity", ""));
+
+        if (entity instanceof application.persistence.mysql.entity.DigitalProductEntity digital) {
+            builder.downloadUrl(digital.getDownloadUrl())
+                    .fileSizeMb(digital.getFileSizeMb())
+                    .fileFormat(digital.getFileFormat())
+                    .licenseKeyRequired(digital.isLicenseKeyRequired())
+                    .maxDownloads(digital.getMaxDownloads());
+        }
+        return builder.build();
     }
 
     private ProductVariantResponse toVariantResponse(ProductVariantEntity entity) {
@@ -258,8 +266,12 @@ public class ProductController {
     }
 
     private ProductEntity toEntity(ProductRequest request, SellerEntity seller) {
-        // Determine product type based on request or default to physical
-        ProductEntity product = new application.persistence.mysql.entity.PhysicalProductEntity();
+        boolean digital = request.getProductType() != null
+                && "DIGITAL".equalsIgnoreCase(request.getProductType());
+
+        ProductEntity product = digital
+                ? new application.persistence.mysql.entity.DigitalProductEntity()
+                : new application.persistence.mysql.entity.PhysicalProductEntity();
         product.setName(request.getName());
         product.setDescription(request.getDescription());
         product.setBasePrice(request.getBasePrice());
@@ -267,10 +279,28 @@ public class ProductController {
         product.setCategory(request.getCategory());
         product.setBrand(request.getBrand());
         product.setImages(request.getImages());
-        product.setWeight(request.getWeight());
-        product.setDimensions(request.getDimensions());
         product.setSeller(seller);
+
+        if (digital) {
+            applyDigitalFields((application.persistence.mysql.entity.DigitalProductEntity) product, request);
+        } else {
+            product.setWeight(request.getWeight());
+            product.setDimensions(request.getDimensions());
+        }
         return product;
+    }
+
+    private void applyDigitalFields(application.persistence.mysql.entity.DigitalProductEntity digital,
+                                    ProductRequest request) {
+        digital.setDownloadUrl(request.getDownloadUrl());
+        digital.setFileSizeMb(request.getFileSizeMb());
+        digital.setFileFormat(request.getFileFormat());
+        if (request.getLicenseKeyRequired() != null) {
+            digital.setLicenseKeyRequired(request.getLicenseKeyRequired());
+        }
+        if (request.getMaxDownloads() != null) {
+            digital.setMaxDownloads(request.getMaxDownloads());
+        }
     }
 
     private void updateEntity(ProductEntity entity, ProductRequest request) {
@@ -280,8 +310,28 @@ public class ProductController {
         entity.setCategory(request.getCategory());
         entity.setBrand(request.getBrand());
         entity.setImages(request.getImages());
-        entity.setWeight(request.getWeight());
-        entity.setDimensions(request.getDimensions());
+        if (entity instanceof application.persistence.mysql.entity.DigitalProductEntity digital) {
+            // En una actualizacion parcial se conservan los datos digitales que
+            // no vengan en la peticion.
+            if (request.getDownloadUrl() != null) {
+                digital.setDownloadUrl(request.getDownloadUrl());
+            }
+            if (request.getFileSizeMb() != null) {
+                digital.setFileSizeMb(request.getFileSizeMb());
+            }
+            if (request.getFileFormat() != null) {
+                digital.setFileFormat(request.getFileFormat());
+            }
+            if (request.getLicenseKeyRequired() != null) {
+                digital.setLicenseKeyRequired(request.getLicenseKeyRequired());
+            }
+            if (request.getMaxDownloads() != null) {
+                digital.setMaxDownloads(request.getMaxDownloads());
+            }
+        } else {
+            entity.setWeight(request.getWeight());
+            entity.setDimensions(request.getDimensions());
+        }
     }
 
     private ProductVariantEntity toVariantEntity(ProductVariantRequest request, ProductEntity product) {

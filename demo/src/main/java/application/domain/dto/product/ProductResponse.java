@@ -28,4 +28,11 @@ public class ProductResponse {
     private String sellerName;
     private List<ProductVariantResponse> variants;
     private String productType;
+
+    // Datos propios de los productos digitales
+    private String downloadUrl;
+    private Long fileSizeMb;
+    private String fileFormat;
+    private boolean licenseKeyRequired;
+    private Integer maxDownloads;
 }

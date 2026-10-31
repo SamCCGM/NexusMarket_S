@@ -33,6 +33,7 @@ public class AdminReportResponse {
     private Long totalOrders;
     private Map<String, Long> ordersByStatus;
     private Long paidOrders;
+    private Long cancelledOrders;
     private BigDecimal totalRevenue;
 
     // Envios
@@ -42,10 +43,13 @@ public class AdminReportResponse {
     // Devoluciones y reembolsos
     private Long pendingReturns;
     private Long approvedReturns;
+    private Long receivedReturns;
     private Long completedRefunds;
     private BigDecimal totalRefunded;
 
     // Inventario
     private Long lowStockItems;
     private Long totalInventoryRecords;
+    private Long damagedStockItems;
+    private Long totalDamagedUnits;
 }

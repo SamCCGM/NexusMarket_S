@@ -113,6 +113,11 @@ public class ProductService {
         if (product.getSeller() == null || product.getSeller().getId() == null) {
             throw new BusinessRuleException("El producto debe estar asociado a un vendedor valido");
         }
+        if (product instanceof application.persistence.mysql.entity.DigitalProductEntity digital
+                && (digital.getDownloadUrl() == null || digital.getDownloadUrl().isBlank())) {
+            throw new BusinessRuleException(
+                    "El producto digital debe definir la direccion de descarga de su archivo");
+        }
     }
 
     /**

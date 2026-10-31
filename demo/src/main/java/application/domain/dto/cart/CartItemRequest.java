@@ -15,10 +15,10 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CartItemRequest {
-    @NotBlank
-    private String productId;
+    @NotNull
+    private Long productId;
 
-    private String variantId;
+    private Long variantId;
 
     @NotBlank
     private String productName;
@@ -35,6 +35,6 @@ public class CartItemRequest {
     @Positive
     private Integer quantity;
 
-    private String sellerId;
+    private Long sellerId;
     private String sellerName;
 }
