@@ -9,8 +9,10 @@ import application.persistence.mongodb.document.CartItemDocument;
 import application.persistence.mongodb.repository.CartDocumentRepository;
 import application.persistence.mysql.entity.BuyerEntity;
 import application.persistence.mysql.entity.ProductEntity;
+import application.persistence.mysql.entity.ProductVariantEntity;
 import application.persistence.mysql.repository.BuyerRepository;
 import application.persistence.mysql.repository.ProductRepository;
+import application.persistence.mysql.repository.ProductVariantRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -37,6 +39,9 @@ public class CartMongoService {
 
     @Autowired
     private BuyerRepository buyerRepository;
+
+    @Autowired
+    private ProductVariantRepository variantRepository;
 
     // ==================== Domain Services (SDD - Cart Services) ====================
 
@@ -65,7 +70,16 @@ public class CartMongoService {
                 .findFirst();
 
         if (existingItem.isPresent()) {
-            existingItem.get().setQuantity(existingItem.get().getQuantity() + item.getQuantity());
+            CartItemDocument existing = existingItem.get();
+            existing.setQuantity(existing.getQuantity() + item.getQuantity());
+            // El carrito conserva una foto del catalogo, no los valores que
+            // envio el cliente: precio, nombre y vendedor se refrescan desde
+            // el sistema.
+            existing.setProductName(item.getProductName());
+            existing.setVariantName(item.getVariantName());
+            existing.setPrice(item.getPrice());
+            existing.setSellerId(item.getSellerId());
+            existing.setSellerName(item.getSellerName());
         } else {
             cart.getItems().add(item);
         }
@@ -101,6 +115,9 @@ public class CartMongoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Cart item not found: " + productId));
 
         item.setQuantity(quantity);
+        // El producto pudo suspenderse o el vendedor bloquearse desde que se
+        // agrego al carrito: actualizar la cantidad tambien revalida la linea.
+        validateItemForCart(item);
         cart.setUpdatedAt(LocalDateTime.now());
         return cartRepository.save(cart);
     }
@@ -129,6 +146,9 @@ public class CartMongoService {
     // ==================== Persistence / queries ====================
 
     public CartDocument getOrCreateCart(Long buyerId) {
+        // Un carrito siempre pertenece a un comprador existente y activo:
+        // nunca se crea un carrito huerfano.
+        assertActiveBuyer(buyerId);
         return cartRepository.findByBuyerId(buyerId)
                 .orElseGet(() -> {
                     CartDocument cart = new CartDocument();
@@ -144,6 +164,9 @@ public class CartMongoService {
     }
 
     public void clearCart(Long buyerId) {
+        // Vaciar el carrito es una modificacion: un comprador bloqueado no
+        // puede realizarla.
+        assertActiveBuyer(buyerId);
         cartRepository.deleteByBuyerId(buyerId);
     }
 
@@ -186,6 +209,36 @@ public class CartMongoService {
         if (product.getSeller() == null || product.getSeller().getStatus() != UserStatus.ACTIVE) {
             throw new BusinessRuleException(
                     "The seller of this product cannot participate in the Marketplace");
+        }
+
+        ProductVariantEntity variant = null;
+        if (item.getVariantId() != null) {
+            variant = variantRepository.findById(item.getVariantId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Variant not found: " + item.getVariantId()));
+            if (variant.getProduct() == null
+                    || !productId.equals(variant.getProduct().getId())) {
+                throw new BusinessRuleException(
+                        "La variante " + item.getVariantId()
+                                + " no pertenece al producto " + productId);
+            }
+            if (!variant.isActive()) {
+                throw new BusinessRuleException(
+                        "La variante " + item.getVariantId() + " no esta activa");
+            }
+        }
+
+        // El precio y los datos descriptivos se toman del catalogo vigente;
+        // los valores enviados por el cliente solo se usan como entrada, nunca
+        // como fuente de verdad del carrito.
+        item.setProductName(product.getName());
+        item.setSellerId(product.getSeller().getId());
+        item.setSellerName(product.getSeller().getCompanyName());
+        if (variant != null) {
+            item.setVariantName(variant.getVariantName());
+            item.setPrice(variant.getPrice());
+        } else {
+            item.setPrice(product.getBasePrice());
         }
     }
 

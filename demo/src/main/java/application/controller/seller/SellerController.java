@@ -5,6 +5,7 @@ import application.domain.dto.seller.SellerResponse;
 import application.domain.dto.seller.SellerUpdateRequest;
 import application.persistence.mysql.entity.SellerEntity;
 import application.domain.service.SellerService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -57,7 +58,7 @@ public class SellerController {
     @PreAuthorize("hasRole('SELLER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<SellerResponse> updateSeller(
             @PathVariable Long id,
-            @RequestBody SellerUpdateRequest request,
+            @RequestBody @Valid SellerUpdateRequest request,
             java.security.Principal principal) {
 
         return sellerService.findById(id)

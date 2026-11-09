@@ -2,14 +2,14 @@
 
 Marketplace con dos almacenes de datos: **MySQL** para la informacion relacional
 (usuarios, vendedores, productos, pedidos, envios, devoluciones, reembolsos) y
-**MongoDB** para los documentos de carrito, inventario y seguimiento de envios.
+**MongoDB** para los documentos de carrito, inventario, reservas de inventario y seguimiento de envios.
 
 La implementacion vive en [`demo/`](demo) y sigue el SDD de [`SDD/Domain`](SDD/Domain):
 `Domain Model.md`, `Domain Services.md`, `Domain Value Objects.md` y `Outputs Ports.md`.
 
 ## Stack
 
-- Java 17+ (probado con Java 21) y Spring Boot 3.2.5
+- Java 17+ (probado con Java 17) y Spring Boot 3.2.5
 - Spring Web, Spring Security (JWT stateless), Spring Data JPA (MySQL), Spring Data MongoDB
 - Hibernate con `open-in-view=false`; las consultas que alimentan la API cargan de forma
   explicita las relaciones (`@EntityGraph` / `JOIN FETCH`)
@@ -19,6 +19,16 @@ La implementacion vive en [`demo/`](demo) y sigue el SDD de [`SDD/Domain`](SDD/D
   (los identificadores de los documentos de Mongo son sus claves internas)
 
 ## Requisitos
+
+### Opcion A: perfil `local` (sin Docker, recomendado para esta maquina)
+
+- JDK 17 (`java -version`) y el Maven Wrapper incluido.
+- No requiere MySQL, MongoDB ni Docker.
+
+El perfil `local` usa **H2 en memoria en modo MySQL** y un **servidor MongoDB
+en memoria** dentro del mismo proceso. Los datos se reinician en cada arranque.
+
+### Opcion B: perfil `dev` (MySQL + MongoDB reales)
 
 - MySQL en `localhost:3306` (base `nexusmarket`, se crea si no existe)
 - MongoDB en `localhost:27017` (base `nexusmarket_mongo`)
@@ -36,12 +46,30 @@ docker run -d --name nexus-mongo -p 27017:27017 mongo:7
 
 ## Ejecutar
 
+### Sin Docker (perfil `local`)
+
+PowerShell:
+
+```powershell
+cd demo
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=local"
+```
+
+Git Bash / Linux / macOS:
+
+```bash
+cd demo
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+### Con MySQL y MongoDB reales (perfil `dev`)
+
 ```bash
 cd demo
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-El perfil `dev` siembra usuarios de prueba (solo si la base esta vacia):
+Los perfiles `dev` y `local` siembran usuarios de prueba (solo si la base esta vacia):
 
 | Rol | Email | Contrasena |
 | --- | --- | --- |
@@ -55,10 +83,13 @@ Salud del servicio: `GET /api/health`.
 
 1. `POST /api/auth/register` solo crea cuentas **BUYER** (el auto-registro de
    vendedores esta prohibido por el SDD).
-2. `POST /api/auth/login` devuelve un JWT; se envia como `Authorization: Bearer <token>`.
+2. `POST /api/auth/login` devuelve un access token y un refresh token. El access
+   token se envia como `Authorization: Bearer <token>`; el refresh token solo
+   puede usarse en `POST /api/auth/refresh` para renovar el access token.
 3. Un administrador incorpora vendedores con `POST /api/sellers` y compradores
    adicionales con `POST /api/buyers`.
-4. Un comprador bloqueado no puede usar carrito, pagos ni pedidos.
+4. Un comprador bloqueado no puede usar carrito, pagos, pedidos ni renovar
+   credenciales con un refresh token emitido previamente.
 
 ## API (resumen)
 
@@ -68,8 +99,9 @@ Salud del servicio: `GET /api/health`.
 | Compradores | `POST /api/buyers` (ADMIN), `GET /api/buyers`, `GET/PUT /api/buyers/{id}` |
 | Vendedores | `POST /api/sellers` (ADMIN), `PUT/POST /api/sellers/{id}/block`, `/activate` |
 | Bodegas | `GET/POST /api/warehouses`, `PUT/DELETE /api/warehouses/{id}` |
-| Productos | `GET/POST /api/products`, `PUT/DELETE /api/products/{id}`, `POST /api/products/{id}/publish`, `/suspend`, `/discontinue`, variantes en `/{id}/variants` |
-| Inventario | `POST /api/inventory/stock/add`, `/remove`, `/adjust`, `/return`, `/damaged`, `POST /api/inventory/stock/release` |
+| Productos | `GET/POST /api/products`, `PUT/DELETE /api/products/{id}`, `POST /api/products/{id}/publish`, `/suspend`, `/discontinue` |
+| Variantes | `GET/POST /api/products/{productId}/variants`, `PUT /api/products/{productId}/variants/{variantId}`, `POST .../variants/{variantId}/activate`, `/deactivate` |
+| Inventario | `GET /api/inventory/product/{productId}`, `GET /api/inventory/warehouse/{warehouseId}`, `POST /api/inventory/stock/add`, `/remove`, `/adjust`, `/return`, `/damaged`, `POST /api/inventory/stock/release` |
 | Carrito | `GET /api/cart`, `POST /api/cart/items`, `PUT/DELETE /api/cart/items/{id}` |
 | Pedidos | `POST/GET /api/orders`, `GET /api/orders/{id}`, `POST /api/orders/{id}/pay`, `/dispatch`, `/confirm-delivery`, `/finalize`, `/cancel`, `DELETE /api/orders/{id}` (ADMIN), `GET /api/orders/{id}/invoice` |
 | Envios | `POST/GET /api/shipments/order/{orderId}`, `GET /api/shipments/{id}` |
@@ -82,16 +114,31 @@ Salud del servicio: `GET /api/health`.
 - **Productos**: se registran como borrador (`SUSPENDED`) y se publican con
   `PublishProduct`. `ProductStatus = {PUBLISHED, SUSPENDED, DISCONTINUED}`.
   Los productos digitales (`productType=DIGITAL`) exigen `downloadUrl` y no
-  pasan por inventario ni envio fisico.
+  pasan por inventario ni envio fisico. Sus campos (`downloadUrl`, `fileSizeMb`,
+  `fileFormat`, `licenseKeyRequired`, `maxDownloads`) tambien se actualizan con
+  `PUT /api/products/{id}`.
+- **Variantes**: el SKU de variante es unico. Una variante desactivada no se
+  puede comprar, pero las reservas y envios de pedidos ya creados siguen
+  operando. No se pueden crear ni modificar variantes de productos descontinuados.
 - **Inventario**: `available = quantity - reserved - damaged`. `ReserveStock`
   ocurre al crear el pedido; `RemoveStock (SALE_EXIT)` consume la reserva al
   despachar; `ReturnStock` solo reincorpora unidades recibidas y aptas.
   `MarkDamaged` retira disponibilidad sin alterar el total fisico.
+  `AdjustStock` no puede quedar por debajo de las unidades reservadas o danadas:
+  un ajuste no recorta compromisos existentes en silencio. Un `SELLER` solo
+  consulta y opera inventario de sus propios productos y bodegas.
+- **Reservas trazables**: cada asignacion de stock queda registrada con
+  `orderId`, `orderItemId`, bodega, producto, variante y cantidad. La
+  cancelacion libera solo las reservas `ACTIVE` de ese pedido y el despacho
+  consume exactamente las suyas; nunca se liberan ni consumen reservas
+  agregadas de otros pedidos.
 - **Pedidos**: `CreateOrder` valida, reserva inventario y vacia el carrito.
   Ciclo fisico: `PENDING_PAYMENT -> PAID -> DISPATCHED -> DELIVERED -> FINALIZED`.
   Pedido 100% digital: `PAID -> DELIVERED` inmediato (nunca `DISPATCHED`).
   `PENDING_PAYMENT -> CANCELLED` libera la reserva (manual o por expiracion a las
   24 h, configurable). Solo un pedido `CANCELLED` puede borrarse.
+- **Carrito**: el precio, nombre y vendedor de cada linea se toman del catalogo
+  vigente; los valores enviados por el cliente no son fuente de verdad.
 - **Devoluciones/reembolsos**: `RequestReturn -> APPROVED -> (ProcessRefund |
   ReceiveReturnUnits)`. Aprobar no toca inventario, reembolsar tampoco; la
   recepcion reincorpora solo las unidades aptas y registra las dañadas.
@@ -104,16 +151,29 @@ Salud del servicio: `GET /api/health`.
 
 ## Tests
 
-```bash
+PowerShell:
+
+```powershell
 cd demo
-./mvnw test
+.\mvnw.cmd clean test
 ```
 
+Git Bash / Linux / macOS:
+
+```bash
+cd demo
+./mvnw clean test
+```
+
+Resultado actual: **72 pruebas, 0 fallos, 0 errores**.
+
 - 57 tests de dominio (`application.domain.models.*`).
-- 8 tests de humo end-to-end (`application.smoke.MarketplaceSmokeE2ETest`):
+- 15 tests de humo end-to-end (`application.smoke.MarketplaceSmokeE2ETest`):
   arranca la aplicacion real con **H2 en modo MySQL** y **Mongo Java Server
-  in-memory**, y recorre registro/login, alta de vendedor por admin, bodega +
-  producto + stock, carrito, pedido con reserva y limpieza de carrito, pago,
-  envio/despacho/entrega, factura, devolucion, reembolso, recepcion con
-  reintegro, pedido digital, cancelacion, inventario dañado, borrado protegido
-  y reporte administrativo. No requiere Docker ni bases de datos locales.
+  in-memory**, y recorre registro/login con access y refresh tokens, alta de
+  vendedor por admin, bodega + producto + stock, carrito, pedido con reserva y
+  limpieza de carrito, pago, envio/despacho/entrega, factura, devolucion,
+  reembolso, recepcion con reintegro, pedido digital, cancelacion, inventario
+  dañado, ajustes con reservas, reservas exactas por pedido, borrado protegido,
+  ciclo de vida de variantes y reporte administrativo. No requiere Docker ni
+  bases de datos locales.

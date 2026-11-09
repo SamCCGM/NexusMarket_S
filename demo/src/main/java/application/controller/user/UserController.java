@@ -5,6 +5,7 @@ import application.domain.dto.user.UserUpdateRequest;
 import application.domain.enums.UserRole;
 import application.domain.service.UserService;
 import application.persistence.mysql.entity.UserEntity;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -54,7 +55,7 @@ public class UserController {
     @PreAuthorize("hasRole('ADMINISTRATOR')")
     public ResponseEntity<UserResponse> updateUser(
             @PathVariable Long id,
-            @RequestBody UserUpdateRequest request) {
+            @RequestBody @Valid UserUpdateRequest request) {
 
         UserEntity updates = new UserEntity() {};
         updates.setFullName(request.getFullName());

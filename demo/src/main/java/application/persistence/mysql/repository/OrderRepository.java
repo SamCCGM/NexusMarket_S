@@ -30,6 +30,13 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
     @EntityGraph(attributePaths = {"buyer", "items", "items.product", "items.variant"})
     Page<OrderEntity> findByBuyerId(Long buyerId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"buyer", "items", "items.product", "items.variant", "items.product.seller"})
+    @Query("SELECT DISTINCT o FROM OrderEntity o JOIN o.items i JOIN i.product p JOIN p.seller s "
+            + "WHERE o.buyer.id = :buyerId AND s.id = :sellerId")
+    Page<OrderEntity> findByBuyerIdAndSellerId(@Param("buyerId") Long buyerId,
+                                               @Param("sellerId") Long sellerId,
+                                               Pageable pageable);
+
     @EntityGraph(attributePaths = {"buyer", "items", "items.product", "items.variant"})
     Page<OrderEntity> findByStatus(OrderStatus status, Pageable pageable);
 
@@ -52,7 +59,7 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
 
     boolean existsByOrderNumber(String orderNumber);
 
-    @EntityGraph(attributePaths = {"buyer", "items", "items.product", "items.variant"})
+    @EntityGraph(attributePaths = {"buyer", "items", "items.product", "items.variant", "items.product.seller"})
     @Query("SELECT o FROM OrderEntity o WHERE o.id = :id")
     Optional<OrderEntity> findByIdWithDetails(@Param("id") Long id);
 }

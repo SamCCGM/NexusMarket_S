@@ -2,6 +2,7 @@ package application.domain.dto.warehouse;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -35,10 +36,13 @@ public class WarehouseRequest {
     private String postalCode;
 
     @NotNull
-    private String type; // CENTRAL, REGIONAL, LOCAL, FULFILLMENT_CENTER
+    @Pattern(regexp = "(?i)^(MARKETPLACE|SELLER)$",
+            message = "El tipo de bodega debe ser MARKETPLACE o SELLER")
+    private String type; // MARKETPLACE o SELLER
 
     @Positive
     private Integer capacity;
 
-    private boolean active = true;
+    // Null en una actualizacion significa "conservar el estado actual".
+    private Boolean active;
 }

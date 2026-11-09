@@ -14,6 +14,7 @@ import application.persistence.mysql.repository.OrderItemRepository;
 import application.persistence.mysql.repository.OrderRepository;
 import application.persistence.mysql.repository.ReturnRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -87,7 +88,8 @@ public class ReturnService {
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + request.getOrderId()));
 
         if (!order.getBuyer().getId().equals(buyer.getId())) {
-            throw new BusinessRuleException(
+            // Es una violacion de autorizacion, no una regla de negocio: 403.
+            throw new AccessDeniedException(
                     "La devolucion debe corresponder a un pedido del comprador que la solicita");
         }
         if (order.getStatus() != OrderStatus.DELIVERED && order.getStatus() != OrderStatus.FINALIZED) {
@@ -104,8 +106,12 @@ public class ReturnService {
                     "La linea indicada no pertenece al pedido " + request.getOrderId());
         }
 
+        // Las devoluciones ya RECEIVED tambien consumen unidades devolubles:
+        // de lo contrario se podria solicitar dos veces la misma unidad.
         int alreadyRequested = returnRepository.findByOrderItemId(orderItem.getId()).stream()
-                .filter(r -> STATUS_REQUESTED.equals(r.getStatus()) || STATUS_APPROVED.equals(r.getStatus()))
+                .filter(r -> STATUS_REQUESTED.equals(r.getStatus())
+                        || STATUS_APPROVED.equals(r.getStatus())
+                        || STATUS_RECEIVED.equals(r.getStatus()))
                 .mapToInt(ReturnEntity::getQuantity)
                 .sum();
         int returnable = orderItem.getQuantity() - alreadyRequested;

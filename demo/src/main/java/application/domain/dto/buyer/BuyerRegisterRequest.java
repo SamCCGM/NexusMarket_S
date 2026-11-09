@@ -1,5 +1,6 @@
 package application.domain.dto.buyer;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -14,12 +15,14 @@ public class BuyerRegisterRequest {
     private String fullName;
 
     @NotBlank
-    @Size(min = 5, max = 150)
+    @Email
+    @Size(max = 150)
     private String email;
 
     @NotBlank
     @Size(min = 8, max = 100)
     private String password;
 
+    @Size(max = 20)
     private String phoneNumber;
 }

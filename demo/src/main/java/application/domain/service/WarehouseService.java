@@ -6,6 +6,7 @@ import application.domain.enums.WarehouseType;
 import application.exception.BusinessRuleException;
 import application.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,7 +39,7 @@ public class WarehouseService {
         if (warehouse.getType() != WarehouseType.SELLER
                 || warehouse.getSeller() == null
                 || !warehouse.getSeller().getId().equals(sellerId)) {
-            throw new BusinessRuleException(
+            throw new AccessDeniedException(
                     "Un vendedor solo puede operar el inventario de su propia bodega (bodega "
                             + warehouseId + " no autorizada)");
         }
@@ -71,7 +72,7 @@ public class WarehouseService {
      *   servicio no lo modifica.
      */
     public WarehouseEntity updateWarehouse(Long id, WarehouseEntity updates) {
-        WarehouseEntity warehouse = warehouseRepository.findById(id)
+        WarehouseEntity warehouse = warehouseRepository.findByIdWithSeller(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse not found: " + id));
 
         if (updates.getName() != null) {
@@ -96,11 +97,22 @@ public class WarehouseService {
             warehouse.setType(updates.getType());
         }
         if (updates.getCapacity() != null) {
+            int occupied = inventoryMongoService.findByWarehouseId(id).stream()
+                    .mapToInt(i -> i.getQuantity() == null ? 0 : i.getQuantity())
+                    .sum();
+            if (updates.getCapacity() < occupied) {
+                throw new BusinessRuleException(
+                        "La capacidad (" + updates.getCapacity()
+                                + ") no puede ser menor que las existencias actuales (" + occupied + ")");
+            }
             warehouse.setCapacity(updates.getCapacity());
         }
+        warehouse.setActive(updates.isActive());
 
         validateRequiredFields(warehouse);
-        return warehouseRepository.save(warehouse);
+        WarehouseEntity saved = warehouseRepository.save(warehouse);
+        // El controlador mapea seller.companyName fuera de la transaccion.
+        return warehouseRepository.findByIdWithSeller(saved.getId()).orElse(saved);
     }
 
     private void validateRequiredFields(WarehouseEntity warehouse) {
@@ -115,6 +127,13 @@ public class WarehouseService {
         }
         if (warehouse.getType() == WarehouseType.SELLER && warehouse.getSeller() == null) {
             throw new BusinessRuleException("A warehouse of type SELLER must be associated with a seller");
+        }
+        if (warehouse.getType() == WarehouseType.MARKETPLACE && warehouse.getSeller() != null) {
+            throw new BusinessRuleException(
+                    "A warehouse of type MARKETPLACE cannot be owned by a seller");
+        }
+        if (warehouse.getCapacity() != null && warehouse.getCapacity() <= 0) {
+            throw new BusinessRuleException("Warehouse capacity must be greater than zero");
         }
     }
 

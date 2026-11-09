@@ -16,21 +16,19 @@ import application.exception.ResourceNotFoundException;
 import application.persistence.mongodb.document.CartDocument;
 import application.persistence.mongodb.document.CartItemDocument;
 import application.persistence.mongodb.document.InventoryDocument;
+import application.persistence.mongodb.document.StockReservationDocument;
 import application.persistence.mysql.entity.AddressEmbeddable;
 import application.persistence.mysql.entity.BuyerEntity;
 import application.persistence.mysql.entity.DigitalProductEntity;
 import application.persistence.mysql.entity.LogisticsOperatorEntity;
-import application.persistence.mysql.entity.OrderEntity;
-import application.persistence.mysql.entity.OrderItemEntity;
 import application.persistence.mysql.entity.PhysicalProductEntity;
 import application.persistence.mysql.entity.ProductEntity;
 import application.persistence.mysql.entity.ProductVariantEntity;
 import application.persistence.mysql.entity.ShipmentEntity;
+import application.persistence.mysql.entity.WarehouseEntity;
 import application.persistence.mysql.repository.BuyerRepository;
 import application.persistence.mysql.repository.LogisticsOperatorRepository;
 import application.persistence.mysql.repository.WarehouseRepository;
-import application.persistence.mysql.repository.OrderRepository;
-import application.persistence.mysql.repository.OrderItemRepository;
 import application.persistence.mysql.repository.ProductRepository;
 import application.persistence.mysql.repository.ProductVariantRepository;
 import application.persistence.mysql.repository.ShipmentRepository;
@@ -87,6 +85,9 @@ public class OrderService {
 
     @Autowired
     private InventoryMongoService inventoryMongoService;
+
+    @Autowired
+    private StockReservationService stockReservationService;
 
     @Autowired
     private PaymentPort paymentPort;
@@ -173,6 +174,13 @@ public class OrderService {
             subtotal = subtotal.add(item.getTotalPrice());
         }
 
+        // Un pedido con productos fisicos no puede quedar sin destino de envio.
+        if (requiresPhysicalDispatch(order) && !hasCompleteShippingAddress(buyer.getMainAddress())) {
+            throw new BusinessRuleException(
+                    "Los pedidos con productos fisicos requieren una direccion de envio completa "
+                            + "(calle, ciudad y pais) en el perfil del comprador");
+        }
+
         order.setSubtotal(subtotal);
         order.setTotalAmount(subtotal.add(
                 order.getTaxAmount() == null ? BigDecimal.ZERO : order.getTaxAmount())
@@ -183,18 +191,47 @@ public class OrderService {
         OrderEntity saved = orderRepository.save(order);
 
         // ReserveStock: hold pre-pago de las unidades fisicas del pedido.
-        for (OrderItemEntity item : saved.getItems()) {
-            if (requiresPhysical(item.getProduct())) {
-                reserveStockForOrder(
-                        item.getProduct().getId(),
-                        item.getVariant() == null ? null : item.getVariant().getId(),
-                        item.getQuantity(),
-                        item.getProduct().getName());
+        // Cada asignacion (pedido + linea + bodega) queda registrada en
+        // Mongo para que cancelacion/despacho operen solo sobre SUS reservas.
+        // MongoDB no participa de la transaccion JPA: si una reserva posterior
+        // falla, se liberan las reservas ya hechas para no dejar unidades
+        // retenidas por un pedido que finalmente no se crea.
+        List<StockReservationDocument> reservations = new java.util.ArrayList<>();
+        try {
+            for (OrderItemEntity item : saved.getItems()) {
+                if (requiresPhysical(item.getProduct())) {
+                    reserveStockForOrder(
+                            saved.getId(),
+                            item.getId(),
+                            item.getProduct().getId(),
+                            item.getVariant() == null ? null : item.getVariant().getId(),
+                            item.getQuantity(),
+                            item.getProduct().getName(),
+                            reservations);
+                }
             }
+
+            // ClearCart: el pedido formalizo la compra del contenido vigente del carrito.
+            cartMongoService.clearCart(buyerId);
+        } catch (RuntimeException ex) {
+            // Compensacion exacta: se liberan las mismas filas reservadas y se
+            // eliminan los registros de la creacion fallida. Nunca se tocan
+            // reservas de otros pedidos.
+            for (int i = reservations.size() - 1; i >= 0; i--) {
+                StockReservationDocument reservation = reservations.get(i);
+                try {
+                    inventoryMongoService.releaseStock(
+                            reservation.getWarehouseId(), reservation.getProductId(),
+                            reservation.getVariantId(), reservation.getQuantity());
+                    stockReservationService.deleteById(reservation.getId());
+                } catch (RuntimeException ignored) {
+                    // Se preserva la excepcion original; el registro ACTIVE
+                    // queda disponible para diagnostico si la liberacion fallo.
+                }
+            }
+            throw ex;
         }
 
-        // ClearCart: el pedido formalizo la compra del contenido vigente del carrito.
-        cartMongoService.clearCart(buyerId);
         notificationPort.notifyOrderEvent(saved.getId(),
                 "Pedido creado: " + saved.getOrderNumber() + " (queda PENDING_PAYMENT)");
 
@@ -225,12 +262,13 @@ public class OrderService {
         // Un comprador bloqueado no puede confirmar la compra.
         assertBuyerCanOperate(order.getBuyer());
 
-        // Revalidacion de disponibilidad antes de confirmar el pago
+        // Revalidacion antes de confirmar el pago: el pedido ya mantiene una
+        // reserva (ReserveStock), por lo que no se puede volver a restar
+        // reservedQuantity: eso descontaria dos veces las unidades del propio
+        // pedido y haria fallar el pago cuando consume mas de la mitad del stock.
         for (OrderItemEntity item : order.getItems()) {
             if (requiresPhysical(item.getProduct())) {
-                checkAvailability(item.getProduct().getId(),
-                        item.getVariant() == null ? null : item.getVariant().getId(),
-                        item.getQuantity(),
+                checkPaymentAvailability(item,
                         "No hay unidades disponibles para confirmar el pago del producto "
                                 + item.getProduct().getName());
             }
@@ -291,14 +329,9 @@ public class OrderService {
 
         shipment.setStatus("DISPATCHED");
 
-        // Sale exit de inventario por la venta
-        for (OrderItemEntity item : order.getItems()) {
-            if (requiresPhysical(item.getProduct())) {
-                removeStockForOrder(item.getProduct().getId(),
-                        item.getVariant() == null ? null : item.getVariant().getId(),
-                        item.getQuantity());
-            }
-        }
+        // Sale exit de inventario por la venta: consume exactamente las
+        // reservas creadas para ESTE pedido, no reservas agregadas de otros.
+        consumeReservationsForOrder(order);
 
         order.setStatus(OrderStatus.DISPATCHED);
         order.setShippedAt(LocalDateTime.now());
@@ -372,14 +405,10 @@ public class OrderService {
                     "Solo un pedido PENDING_PAYMENT puede cancelarse (estado actual: " + order.getStatus() + ")");
         }
 
-        for (OrderItemEntity item : order.getItems()) {
-            if (requiresPhysical(item.getProduct())) {
-                releaseStockForOrder(
-                        item.getProduct().getId(),
-                        item.getVariant() == null ? null : item.getVariant().getId(),
-                        item.getQuantity());
-            }
-        }
+        // Libera exclusivamente las reservas registradas para este pedido.
+        // La bodega puede estar inactiva: liberar un compromiso ya existente
+        // debe funcionar igual (InventoryMongoService.releaseStock lo permite).
+        releaseReservationsForOrder(order);
 
         order.setStatus(OrderStatus.CANCELLED);
         OrderEntity saved = orderRepository.save(order);
@@ -552,6 +581,14 @@ public class OrderService {
         return orderRepository.findByBuyerId(buyerId, pageable);
     }
 
+    /**
+     * Pedidos de un comprador que contienen al menos un producto del vendedor.
+     * Evita que un vendedor vea el historial completo de compras del comprador.
+     */
+    public Page<OrderEntity> findByBuyerIdAndSellerId(Long buyerId, Long sellerId, Pageable pageable) {
+        return orderRepository.findByBuyerIdAndSellerId(buyerId, sellerId, pageable);
+    }
+
     public List<OrderEntity> findByStatus(OrderStatus status) {
         return orderRepository.findByStatus(status);
     }
@@ -587,6 +624,9 @@ public class OrderService {
                             + order.getStatus() + ")");
         }
         orderRepository.deleteById(id);
+        // El pedido cancelado ya no existe: sus reservas (RELEASED) dejan de
+        // tener sentido como trazabilidad historica y se eliminan tambien.
+        stockReservationService.deleteByOrder(id);
     }
 
     // ==================== Internal ====================
@@ -638,6 +678,16 @@ public class OrderService {
             variant = variantRepository.findById(cartItem.getVariantId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Variant not found: " + cartItem.getVariantId()));
+            if (variant.getProduct() == null
+                    || !productId.equals(variant.getProduct().getId())) {
+                throw new BusinessRuleException(
+                        "La variante " + cartItem.getVariantId()
+                                + " no pertenece al producto " + productId);
+            }
+            if (!variant.isActive()) {
+                throw new BusinessRuleException(
+                        "La variante " + cartItem.getVariantId() + " no esta activa");
+            }
         }
 
         Long variantIdKey = variant == null ? null : variant.getId();
@@ -668,6 +718,7 @@ public class OrderService {
         boolean available = inventoryMongoService.findByProductId(productId).stream()
                 .filter(i -> Objects.equals(i.getVariantId(), variantId))
                 .filter(i -> i.getStatus() != InventoryStatus.DAMAGED)
+                .filter(i -> isWarehouseOperable(i.getWarehouseId()))
                 .mapToInt(InventoryDocument::getAvailableQuantity)
                 .sum() >= quantity;
         if (!available) {
@@ -676,16 +727,72 @@ public class OrderService {
     }
 
     /**
-     * ReserveStock al crear el pedido: reserva unidades de manera consistente
-     * a traves de las bodegas disponibles (cantidad disponible desc). Usa la
-     * MISMA asignacion que removeStockForOrder para que el SALE_EXIT consume
-     * exactamente la reserva hecha aqui.
+     * Revalidacion de disponibilidad para un pedido que YA tiene una reserva
+     * hecha por ReserveStock. El stock vendible es quantity - damaged (las
+     * unidades reservadas siguen fisicamente en la bodega y pertenecen a algun
+     * pedido pendiente, incluido el que se esta pagando). Ademas se comprueba
+     * que la reserva trazable de ESTA linea siga activa.
      */
-    private void reserveStockForOrder(Long productId, Long variantId, Integer quantity, String productName) {
+    private void checkPaymentAvailability(OrderItemEntity item, String message) {
+        Long productId = item.getProduct().getId();
+        Long variantId = item.getVariant() == null ? null : item.getVariant().getId();
+
+        List<StockReservationDocument> activeReservations =
+                stockReservationService.findActiveByOrderItem(item.getId());
+        int activeReserved = activeReservations.stream()
+                .mapToInt(StockReservationDocument::getQuantity)
+                .sum();
+        if (activeReserved < item.getQuantity()) {
+            throw new BusinessRuleException(message + " (reserva del pedido incompleta: "
+                    + activeReserved + " de " + item.getQuantity() + " unidades)");
+        }
+
+        // Se valida cada asignacion contra la fila de inventario concreta:
+        // una reserva no queda cubierta por stock de otra bodega.
+        for (StockReservationDocument reservation : activeReservations) {
+            InventoryDocument row = inventoryMongoService
+                    .findByWarehouseIdAndProductIdAndVariantId(
+                            reservation.getWarehouseId(), productId, variantId)
+                    .orElseThrow(() -> new BusinessRuleException(message));
+            int sellable = zeroIfNull(row.getQuantity()) - zeroIfNull(row.getDamagedQuantity());
+            if (sellable < reservation.getQuantity()) {
+                throw new BusinessRuleException(message);
+            }
+        }
+    }
+
+    private int zeroIfNull(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    /**
+     * Solo las bodegas activas pueden aportar stock a pedidos nuevos. Las
+     * bodegas inactivas conservan sus filas para liberar o consumir reservas
+     * ya comprometidas, pero no deben bloquear una compra con stock disponible
+     * en otras bodegas ni contarse como disponibilidad vendible.
+     */
+    private boolean isWarehouseOperable(Long warehouseId) {
+        if (warehouseId == null) {
+            return false;
+        }
+        return warehouseRepository.findById(warehouseId)
+                .map(WarehouseEntity::isActive)
+                .orElse(false);
+    }
+
+    /**
+     * ReserveStock al crear el pedido: reserva unidades de manera consistente
+     * a traves de las bodegas disponibles (cantidad disponible desc) y registra
+     * cada asignacion con el pedido y la linea que la origino.
+     */
+    private void reserveStockForOrder(Long orderId, Long orderItemId, Long productId, Long variantId,
+                                      Integer quantity, String productName,
+                                      List<StockReservationDocument> reservations) {
         int remaining = quantity;
         List<InventoryDocument> rows = inventoryMongoService.findByProductId(productId).stream()
                 .filter(i -> Objects.equals(i.getVariantId(), variantId))
                 .filter(i -> i.getStatus() != InventoryStatus.DAMAGED)
+                .filter(i -> isWarehouseOperable(i.getWarehouseId()))
                 .sorted(Comparator.comparingInt(InventoryDocument::getAvailableQuantity).reversed())
                 .toList();
 
@@ -696,6 +803,16 @@ public class OrderService {
             int partial = Math.min(remaining, row.getAvailableQuantity());
             if (partial > 0) {
                 inventoryMongoService.reserveStock(row.getWarehouseId(), productId, variantId, partial);
+                try {
+                    reservations.add(stockReservationService.create(
+                            orderId, orderItemId, row.getWarehouseId(), productId, variantId, partial));
+                } catch (RuntimeException ex) {
+                    // El agregado ya se incremento, pero el registro trazable
+                    // no pudo guardarse: se revierte esa asignacion puntual.
+                    inventoryMongoService.releaseStock(
+                            row.getWarehouseId(), productId, variantId, partial);
+                    throw ex;
+                }
                 remaining -= partial;
             }
         }
@@ -708,68 +825,77 @@ public class OrderService {
     }
 
     /**
-     * Sale exit del inventario al despachar: descuenta unidades de manera
-     * consistente a traves de las bodegas que contienen el producto. Consume
-     * primero las filas con reserva (el hold pre-pago de este pedido) y luego
-     * las restantes por cantidad total; removeStock libera la reserva
-     * correspondiente al salir las unidades vendidas.
+     * Sale exit del inventario al despachar. Consume exactamente las reservas
+     * ACTIVE asociadas a cada linea del pedido, de modo que nunca descuenta
+     * unidades retenidas por otro pedido.
      */
-    private void removeStockForOrder(Long productId, Long variantId, Integer quantity) {
-        int remaining = quantity;
-        List<InventoryDocument> rows = inventoryMongoService.findByProductId(productId).stream()
-                .filter(i -> Objects.equals(i.getVariantId(), variantId))
-                .sorted(Comparator
-                        .comparingInt(InventoryDocument::getReservedQuantity).reversed()
-                        .thenComparing(Comparator.comparingInt(InventoryDocument::getQuantity).reversed()))
-                .toList();
+    private void consumeReservationsForOrder(OrderEntity order) {
+        List<StockReservationDocument> active = stockReservationService.findActiveByOrder(order.getId());
 
-        for (InventoryDocument row : rows) {
-            if (remaining <= 0) {
-                break;
+        for (OrderItemEntity item : order.getItems()) {
+            if (!requiresPhysical(item.getProduct())) {
+                continue;
             }
-            int partial = Math.min(remaining, row.getQuantity());
-            if (partial > 0) {
-                inventoryMongoService.removeStock(row.getWarehouseId(), productId, variantId, partial);
-                remaining -= partial;
+            int reserved = active.stream()
+                    .filter(r -> Objects.equals(r.getOrderItemId(), item.getId()))
+                    .mapToInt(StockReservationDocument::getQuantity)
+                    .sum();
+            if (reserved != item.getQuantity()) {
+                throw new BusinessRuleException(
+                        "Las reservas del pedido no coinciden con la linea " + item.getId()
+                                + " (reservado: " + reserved + ", pedido: " + item.getQuantity() + ")");
             }
         }
 
-        if (remaining > 0) {
-            throw new BusinessRuleException(
-                    "El inventario ya no cubre la cantidad del pedido (faltan " + remaining + " unidades)");
+        // Se valida todo antes de tocar inventario para no dejar un despacho a
+        // medias si una fila ya no cubre la reserva.
+        for (StockReservationDocument reservation : active) {
+            InventoryDocument row = inventoryMongoService
+                    .findByWarehouseIdAndProductIdAndVariantId(
+                            reservation.getWarehouseId(), reservation.getProductId(), reservation.getVariantId())
+                    .orElseThrow(() -> new BusinessRuleException(
+                            "No existe inventario para consumir la reserva " + reservation.getId()));
+            int sellable = zeroIfNull(row.getQuantity()) - zeroIfNull(row.getDamagedQuantity());
+            if (sellable < reservation.getQuantity()) {
+                throw new BusinessRuleException(
+                        "El inventario ya no cubre la reserva del pedido (faltan "
+                                + (reservation.getQuantity() - sellable) + " unidades)");
+            }
+        }
+
+        for (StockReservationDocument reservation : active) {
+            inventoryMongoService.removeStock(
+                    reservation.getWarehouseId(), reservation.getProductId(),
+                    reservation.getVariantId(), reservation.getQuantity());
+            stockReservationService.markConsumed(reservation);
         }
     }
 
     /**
-     * Libera la reserva hecha por ReserveStock al crear el pedido (pago
-     * fallido/cancelado): consume primero las filas con mayor reserva y nunca
-     * deja la reserva en negativo. Las existencias totales no cambian.
+     * Libera las reservas ACTIVE del pedido al cancelarlo. Si una reserva no
+     * puede liberarse, se conserva ACTIVE para diagnostico y se notifica; no se
+     * libera ninguna reserva agregada de otros pedidos.
      */
-    private void releaseStockForOrder(Long productId, Long variantId, Integer quantity) {
-        int remaining = quantity;
-        List<InventoryDocument> rows = inventoryMongoService.findByProductId(productId).stream()
-                .filter(i -> Objects.equals(i.getVariantId(), variantId))
-                .filter(i -> i.getReservedQuantity() > 0)
-                .sorted(Comparator.comparingInt(InventoryDocument::getReservedQuantity).reversed())
-                .toList();
+    private void releaseReservationsForOrder(OrderEntity order) {
+        List<StockReservationDocument> active = stockReservationService.findActiveByOrder(order.getId());
 
-        for (InventoryDocument row : rows) {
-            if (remaining <= 0) {
-                break;
-            }
-            int partial = Math.min(remaining, row.getReservedQuantity());
-            if (partial > 0) {
-                inventoryMongoService.releaseStock(row.getWarehouseId(), productId, variantId, partial);
-                remaining -= partial;
-            }
+        if (active.isEmpty() && requiresPhysicalDispatch(order)) {
+            notificationPort.notifyOrderEvent(order.getId(),
+                    "Pedido fisico sin reservas trazables al cancelar; no se libero stock de otros pedidos");
+            return;
         }
 
-        if (remaining > 0) {
-            // No es un error fatal: el estado real del inventario pudo cambiar
-            // (p.ej. ajustes del operador) y nunca se libera mas de lo reservado.
-            notificationPort.notifyOrderEvent(null,
-                    "Reserva de inventario incompleta al liberar producto " + productId
-                            + " (faltaron " + remaining + " unidades reservadas)");
+        for (StockReservationDocument reservation : active) {
+            try {
+                inventoryMongoService.releaseStock(
+                        reservation.getWarehouseId(), reservation.getProductId(),
+                        reservation.getVariantId(), reservation.getQuantity());
+                stockReservationService.markReleased(reservation);
+            } catch (RuntimeException ex) {
+                notificationPort.notifyOrderEvent(order.getId(),
+                        "No se pudo liberar la reserva " + reservation.getId()
+                                + " del pedido; queda pendiente de revision");
+            }
         }
     }
 
@@ -781,6 +907,13 @@ public class OrderService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private boolean hasCompleteShippingAddress(AddressEmbeddable address) {
+        return address != null
+                && !isBlank(address.getStreet())
+                && !isBlank(address.getCity())
+                && !isBlank(address.getCountry());
     }
 
     private boolean requiresPhysicalDispatch(OrderEntity order) {

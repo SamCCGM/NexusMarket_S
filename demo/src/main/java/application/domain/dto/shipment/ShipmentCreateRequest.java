@@ -1,6 +1,8 @@
 package application.domain.dto.shipment;
 
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
@@ -9,9 +11,15 @@ import lombok.Data;
  */
 @Data
 public class ShipmentCreateRequest {
+    @Positive
     private Long logisticsOperatorId;
+
+    @Positive
     private Long warehouseId;
+
+    @Size(max = 150)
     private String carrier;
+
     @PositiveOrZero
     private Integer estimatedDays;
 }

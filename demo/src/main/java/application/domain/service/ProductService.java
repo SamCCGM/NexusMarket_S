@@ -1,5 +1,6 @@
 package application.domain.service;
 
+import application.persistence.mongodb.repository.CartDocumentRepository;
 import application.persistence.mysql.entity.ProductEntity;
 import application.persistence.mysql.entity.ProductVariantEntity;
 import application.persistence.mysql.repository.OrderItemRepository;
@@ -29,6 +30,12 @@ public class ProductService {
 
     @Autowired
     private OrderItemRepository orderItemRepository;
+
+    @Autowired
+    private InventoryMongoService inventoryMongoService;
+
+    @Autowired
+    private CartDocumentRepository cartRepository;
 
     public ProductEntity save(ProductEntity product) {
         return productRepository.save(product);
@@ -86,6 +93,14 @@ public class ProductService {
         if (orderItemRepository.existsByProductId(id)) {
             throw new BusinessRuleException(
                     "El producto tiene pedidos asociados: no puede eliminarse, use DiscontinueProduct");
+        }
+        if (!inventoryMongoService.findByProductId(id).isEmpty()) {
+            throw new BusinessRuleException(
+                    "El producto tiene registros de inventario: no puede eliminarse, use DiscontinueProduct");
+        }
+        if (!cartRepository.findByItemsProductId(id).isEmpty()) {
+            throw new BusinessRuleException(
+                    "El producto esta referenciado en carritos: no puede eliminarse, use DiscontinueProduct");
         }
         productRepository.delete(product);
     }
@@ -156,6 +171,17 @@ public class ProductService {
         existing.setImages(product.getImages());
         existing.setWeight(product.getWeight());
         existing.setDimensions(product.getDimensions());
+        // Los campos propios de un producto digital no viajan por las propiedades
+        // comunes de ProductEntity: hay que copiarlos explicitamente o una
+        // actualizacion los descartaria en silencio.
+        if (existing instanceof application.persistence.mysql.entity.DigitalProductEntity existingDigital
+                && product instanceof application.persistence.mysql.entity.DigitalProductEntity updatesDigital) {
+            existingDigital.setDownloadUrl(updatesDigital.getDownloadUrl());
+            existingDigital.setFileSizeMb(updatesDigital.getFileSizeMb());
+            existingDigital.setFileFormat(updatesDigital.getFileFormat());
+            existingDigital.setLicenseKeyRequired(updatesDigital.isLicenseKeyRequired());
+            existingDigital.setMaxDownloads(updatesDigital.getMaxDownloads());
+        }
         return productRepository.save(existing);
     }
 
@@ -207,7 +233,108 @@ public class ProductService {
 
     // Variant operations
     public ProductVariantEntity saveVariant(ProductVariantEntity variant) {
+        if (variant.getProduct() == null || variant.getProduct().getId() == null) {
+            throw new BusinessRuleException("La variante debe estar asociada a un producto valido");
+        }
+
+        ProductEntity product = productRepository.findById(variant.getProduct().getId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Producto no encontrado con id: " + variant.getProduct().getId()));
+        if (product.getStatus() == ProductStatus.DISCONTINUED) {
+            throw new BusinessRuleException(
+                    "No se pueden agregar variantes a un producto descontinuado");
+        }
+
+        validateVariantData(variant);
+        assertVariantSkuAvailable(variant.getSku(), null);
+        variant.setProduct(product);
         return variantRepository.save(variant);
+    }
+
+    /**
+     * UpdateVariant: actualiza nombre, SKU, precio, stock, atributos y estado de
+     * una variante. Solo el vendedor propietario (o un administrador) llega
+     * aqui; el servicio comprueba ademas que la variante pertenezca al producto.
+     */
+    public ProductVariantEntity updateVariant(Long productId, Long variantId,
+                                              ProductVariantEntity updates) {
+        ProductVariantEntity variant = findVariantInProduct(productId, variantId);
+        if (variant.getProduct().getStatus() == ProductStatus.DISCONTINUED) {
+            throw new BusinessRuleException(
+                    "No se pueden modificar variantes de un producto descontinuado");
+        }
+
+        validateVariantData(updates);
+        assertVariantSkuAvailable(updates.getSku(), variantId);
+
+        variant.setVariantName(updates.getVariantName());
+        variant.setSku(updates.getSku());
+        variant.setPrice(updates.getPrice());
+        variant.setStock(updates.getStock());
+        variant.setAttributes(updates.getAttributes());
+        variant.setActive(updates.isActive());
+        return variantRepository.save(variant);
+    }
+
+    public ProductVariantEntity deactivateVariant(Long productId, Long variantId) {
+        ProductVariantEntity variant = findVariantInProduct(productId, variantId);
+        if (!variant.isActive()) {
+            throw new BusinessRuleException("La variante " + variantId + " ya esta inactiva");
+        }
+        variant.setActive(false);
+        return variantRepository.save(variant);
+    }
+
+    public ProductVariantEntity activateVariant(Long productId, Long variantId) {
+        ProductVariantEntity variant = findVariantInProduct(productId, variantId);
+        if (variant.getProduct().getStatus() == ProductStatus.DISCONTINUED) {
+            throw new BusinessRuleException(
+                    "No se puede activar una variante de un producto descontinuado");
+        }
+        if (variant.isActive()) {
+            throw new BusinessRuleException("La variante " + variantId + " ya esta activa");
+        }
+        variant.setActive(true);
+        return variantRepository.save(variant);
+    }
+
+    private ProductVariantEntity findVariantInProduct(Long productId, Long variantId) {
+        ProductVariantEntity variant = variantRepository.findById(variantId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Variante no encontrada con id: " + variantId));
+        if (variant.getProduct() == null || !productId.equals(variant.getProduct().getId())) {
+            throw new BusinessRuleException(
+                    "La variante " + variantId + " no pertenece al producto " + productId);
+        }
+        return variant;
+    }
+
+    private void validateVariantData(ProductVariantEntity variant) {
+        if (variant.getVariantName() == null || variant.getVariantName().isBlank()) {
+            throw new BusinessRuleException("El nombre de la variante es obligatorio");
+        }
+        if (variant.getPrice() == null || variant.getPrice().signum() <= 0) {
+            throw new BusinessRuleException("El precio de la variante debe ser mayor que cero");
+        }
+        if (variant.getStock() != null && variant.getStock() < 0) {
+            throw new BusinessRuleException("El stock de la variante no puede ser negativo");
+        }
+    }
+
+    /**
+     * El SKU de variante, cuando se informa, debe ser unico en el catalogo de
+     * variantes. En una actualizacion se excluye la propia variante.
+     */
+    private void assertVariantSkuAvailable(String sku, Long currentVariantId) {
+        if (sku == null || sku.isBlank()) {
+            return;
+        }
+        variantRepository.findBySku(sku).ifPresent(existing -> {
+            if (currentVariantId == null || !currentVariantId.equals(existing.getId())) {
+                throw new BusinessRuleException(
+                        "Ya existe una variante con el SKU: " + sku);
+            }
+        });
     }
 
     public List<ProductVariantEntity> findVariantsByProductId(Long productId) {

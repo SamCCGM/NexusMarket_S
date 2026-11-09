@@ -51,11 +51,21 @@ public class BuyerController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMINISTRATOR') or hasRole('SELLER')")
-    public ResponseEntity<BuyerResponse> getBuyerById(@PathVariable Long id) {
+    @PreAuthorize("hasRole('BUYER') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<BuyerResponse> getBuyerById(@PathVariable Long id,
+                                                      Authentication authentication) {
         return buyerService.findById(id)
-                .map(this::toResponse)
-                .map(ResponseEntity::ok)
+                .map(existing -> {
+                    // El comprador solo puede leer sus propios datos; un
+                    // vendedor no tiene acceso a la PII del comprador.
+                    boolean isOwner = authentication.getName().equals(existing.getEmail());
+                    boolean isAdmin = authentication.getAuthorities().stream()
+                            .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRATOR"));
+                    if (!isOwner && !isAdmin) {
+                        return ResponseEntity.status(403).<BuyerResponse>build();
+                    }
+                    return ResponseEntity.ok(toResponse(existing));
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -67,7 +77,7 @@ public class BuyerController {
     @PreAuthorize("hasRole('BUYER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<BuyerResponse> updateBuyer(
             @PathVariable Long id,
-            @RequestBody BuyerUpdateRequest request,
+            @RequestBody @Valid BuyerUpdateRequest request,
             Authentication authentication) {
 
         return buyerService.findById(id)

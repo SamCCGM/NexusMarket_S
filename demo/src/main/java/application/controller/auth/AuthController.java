@@ -6,15 +6,13 @@ import application.domain.enums.UserStatus;
 import application.domain.dto.auth.AuthRequest;
 import application.domain.dto.auth.AuthResponse;
 import application.domain.dto.auth.RegisterRequest;
-import application.persistence.mysql.entity.AdministratorEntity;
 import application.persistence.mysql.entity.BuyerEntity;
-import application.persistence.mysql.entity.LogisticsOperatorEntity;
-import application.persistence.mysql.entity.SellerEntity;
 import application.persistence.mysql.entity.UserEntity;
 import application.persistence.mysql.repository.UserRepository;
-import application.domain.service.UserService;
+import application.domain.service.BuyerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -29,7 +27,7 @@ public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
-    private final UserService userService;
+    private final BuyerService buyerService;
     private final UserDetailsService userDetailsService;
     private final JwtService jwtService;
 
@@ -40,8 +38,10 @@ public class AuthController {
         );
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
-        UserEntity user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        UserEntity user = userRepository.findByEmail(request.getEmail()).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
 
         String accessToken = jwtService.generateToken(userDetails);
         String refreshToken = jwtService.generateRefreshToken(userDetails);
@@ -69,8 +69,16 @@ public class AuthController {
             return ResponseEntity.badRequest().build();
         }
 
-        UserEntity user = buildUserEntity(request);
-        user = userService.registerUser(user);
+        // Un unico camino de alta de compradores: cifra la contrasena y deja
+        // buyerStatus ACTIVE, igual que el alta realizada por un administrador.
+        BuyerEntity buyer = BuyerEntity.builder()
+                .fullName(request.getFullName())
+                .email(request.getEmail())
+                .password(request.getPassword())
+                .role(UserRole.BUYER)
+                .status(UserStatus.ACTIVE)
+                .build();
+        UserEntity user = buyerService.registerBuyer(buyer);
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
         String accessToken = jwtService.generateToken(userDetails);
@@ -88,19 +96,32 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refreshToken(@RequestHeader("Authorization") String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
         String refreshToken = authHeader.substring(7);
         String email = jwtService.extractUsername(refreshToken);
         UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
-        if (!jwtService.isTokenValid(refreshToken, userDetails)) {
-            return ResponseEntity.badRequest().build();
+        // Un token de refresco no sirve si la cuenta fue bloqueada o deshabilitada
+        // despues de emitirlo.
+        boolean accountCanAuthenticate = userDetails.isEnabled()
+                && userDetails.isAccountNonLocked()
+                && userDetails.isAccountNonExpired()
+                && userDetails.isCredentialsNonExpired();
+        if (!accountCanAuthenticate) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
-        UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        // Solo un token emitido como REFRESH puede renovar credenciales.
+        if (!jwtService.isRefreshTokenValid(refreshToken, userDetails)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        UserEntity user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
 
         String accessToken = jwtService.generateToken(userDetails);
         String newRefreshToken = jwtService.generateRefreshToken(userDetails);
@@ -114,37 +135,4 @@ public class AuthController {
                 .build());
     }
 
-    private UserEntity buildUserEntity(RegisterRequest request) {
-        UserRole role = UserRole.valueOf(request.getRole().toUpperCase());
-        return switch (role) {
-            case BUYER -> BuyerEntity.builder()
-                    .fullName(request.getFullName())
-                    .email(request.getEmail())
-                    .password(request.getPassword())
-                    .role(role)
-                    .status(UserStatus.ACTIVE)
-                    .build();
-            case SELLER -> SellerEntity.builder()
-                    .fullName(request.getFullName())
-                    .email(request.getEmail())
-                    .password(request.getPassword())
-                    .role(role)
-                    .status(UserStatus.ACTIVE)
-                    .build();
-            case LOGISTICS_OPERATOR -> LogisticsOperatorEntity.builder()
-                    .fullName(request.getFullName())
-                    .email(request.getEmail())
-                    .password(request.getPassword())
-                    .role(role)
-                    .status(UserStatus.ACTIVE)
-                    .build();
-            case ADMINISTRATOR -> AdministratorEntity.builder()
-                    .fullName(request.getFullName())
-                    .email(request.getEmail())
-                    .password(request.getPassword())
-                    .role(role)
-                    .status(UserStatus.ACTIVE)
-                    .build();
-        };
-    }
 }

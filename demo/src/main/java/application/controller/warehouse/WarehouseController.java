@@ -108,8 +108,13 @@ public class WarehouseController {
                         return ResponseEntity.status(403).<WarehouseResponse>build();
                     }
 
-                    // UpdateWarehouse (SDD): valida existencia y reglas de registro
-                    WarehouseEntity updated = warehouseService.updateWarehouse(id, toEntity(request, existing.getSeller()));
+                    // UpdateWarehouse (SDD): valida existencia y reglas de registro.
+                    // Si la peticion no envia "active", se conserva el estado actual.
+                    WarehouseEntity updates = toEntity(request, existing.getSeller());
+                    if (request.getActive() == null) {
+                        updates.setActive(existing.isActive());
+                    }
+                    WarehouseEntity updated = warehouseService.updateWarehouse(id, updates);
                     return ResponseEntity.ok(toResponse(updated));
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -167,7 +172,9 @@ public class WarehouseController {
         warehouse.setPostalCode(request.getPostalCode());
         warehouse.setType(application.domain.enums.WarehouseType.valueOf(request.getType().toUpperCase()));
         warehouse.setCapacity(request.getCapacity());
-        warehouse.setActive(request.isActive());
+        if (request.getActive() != null) {
+            warehouse.setActive(request.getActive());
+        }
         warehouse.setSeller(seller);
         return warehouse;
     }

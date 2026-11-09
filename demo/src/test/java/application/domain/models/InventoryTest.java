@@ -82,13 +82,14 @@ class InventoryTest {
     }
 
     @Test
-    @DisplayName("adjustTo no admite existencias negativas y ajusta la reserva")
+    @DisplayName("adjustTo no admite existencias negativas ni recorta reservas")
     void adjust() {
         Inventory inv = inventory(10, InventoryStatus.AVAILABLE);
         inv.reserve(8);
-        inv.adjustTo(5);
-        assertEquals(5, inv.getQuantity());
-        assertEquals(5, inv.getReservedQuantity());
+        assertThrows(BusinessRuleException.class, () -> inv.adjustTo(5));
+        inv.adjustTo(8);
+        assertEquals(8, inv.getQuantity());
+        assertEquals(8, inv.getReservedQuantity());
         assertThrows(BusinessRuleException.class, () -> inv.adjustTo(-1));
     }
 
@@ -133,10 +134,11 @@ class InventoryTest {
         Inventory inv = inventory(10, InventoryStatus.AVAILABLE);
         inv.reserve(4);
         inv.markDamaged(3);
-        inv.adjustTo(5);
-        assertEquals(5, inv.getQuantity());
+        assertThrows(BusinessRuleException.class, () -> inv.adjustTo(5));
+        inv.adjustTo(7);
+        assertEquals(7, inv.getQuantity());
         assertEquals(4, inv.getReservedQuantity());
-        assertEquals(1, inv.getDamagedQuantity());
+        assertEquals(3, inv.getDamagedQuantity());
         assertTrue(inv.getAvailableQuantity() >= 0);
     }
 }

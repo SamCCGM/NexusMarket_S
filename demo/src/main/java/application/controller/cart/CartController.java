@@ -10,6 +10,8 @@ import application.domain.service.CartMongoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,6 +22,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/cart")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('BUYER')")
 public class CartController {
 
     private final CartMongoService cartService;
@@ -104,7 +107,8 @@ public class CartController {
         // perfil de comprador para obtener su id y acotar el carrito propio.
         String email = authentication.getName();
         return buyerService.findByUserEntityEmail(email)
-                .orElseThrow(() -> new RuntimeException("Buyer profile not found"))
+                .orElseThrow(() -> new AccessDeniedException(
+                        "El usuario autenticado no tiene perfil de comprador: " + email))
                 .getId();
     }
 

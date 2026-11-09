@@ -6,8 +6,11 @@ import application.domain.dto.order.OrderItemResponse;
 import application.persistence.mysql.entity.BuyerEntity;
 import application.persistence.mysql.entity.OrderEntity;
 import application.persistence.mysql.entity.OrderItemEntity;
+import application.persistence.mysql.entity.SellerEntity;
 import application.domain.service.BuyerService;
 import application.domain.service.OrderService;
+import application.domain.service.SellerService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,22 +29,19 @@ public class OrderController {
 
     private final OrderService orderService;
     private final BuyerService buyerService;
+    private final SellerService sellerService;
 
     @PostMapping
-    @PreAuthorize("hasRole('BUYER') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasRole('BUYER')")
     public ResponseEntity<OrderResponse> createOrder(
-            @RequestBody(required = false) OrderRequest request,
+            @RequestBody(required = false) @Valid OrderRequest request,
             Authentication authentication) {
 
-        // Solo el comprador propietario del carrito puede crear el pedido
+        // Solo el comprador propietario del carrito puede crear el pedido:
+        // el buyerId nunca se toma del cliente.
         String email = authentication.getName();
-        BuyerEntity buyer = buyerService.findByUserEntityEmail(email)
-                .orElseThrow(() -> new RuntimeException("Buyer profile not found"));
-
-        if (request != null && request.getBuyerId() != null
-                && !buyer.getId().equals(request.getBuyerId())
-                && !authentication.getAuthorities().stream()
-                        .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRATOR"))) {
+        BuyerEntity buyer = buyerService.findByUserEntityEmail(email).orElse(null);
+        if (buyer == null) {
             return ResponseEntity.status(403).build();
         }
 
@@ -55,22 +55,28 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<OrderResponse> getOrderById(@PathVariable Long id) {
-        return orderService.findById(id)
-                .map(this::toResponse)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<OrderResponse> getOrderById(@PathVariable Long id, Authentication authentication) {
+        OrderEntity order = orderService.findById(id).orElse(null);
+        if (order == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!canAccessOrder(order, authentication)) {
+            return ResponseEntity.status(403).build();
+        }
+        return ResponseEntity.ok(toResponse(order));
     }
 
     @GetMapping("/my-orders")
-    @PreAuthorize("hasRole('BUYER') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasRole('BUYER')")
     public ResponseEntity<Page<OrderResponse>> getMyOrders(
             Authentication authentication,
             Pageable pageable) {
         
         String email = authentication.getName();
-        BuyerEntity buyer = buyerService.findByUserEntityEmail(email)
-                .orElseThrow(() -> new RuntimeException("Buyer profile not found"));
+        BuyerEntity buyer = buyerService.findByUserEntityEmail(email).orElse(null);
+        if (buyer == null) {
+            return ResponseEntity.status(403).build();
+        }
 
         Page<OrderEntity> orders = orderService.findByBuyerId(buyer.getId(), pageable);
         return ResponseEntity.ok(orders.map(this::toResponse));
@@ -80,10 +86,21 @@ public class OrderController {
     @PreAuthorize("hasRole('SELLER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<Page<OrderResponse>> getOrdersByBuyer(
             @PathVariable Long buyerId,
-            Pageable pageable) {
-        
-        Page<OrderEntity> orders = orderService.findByBuyerId(buyerId, pageable);
-        return ResponseEntity.ok(orders.map(this::toResponse));
+            Pageable pageable,
+            Authentication authentication) {
+
+        if (isAdmin(authentication)) {
+            return ResponseEntity.ok(orderService.findByBuyerId(buyerId, pageable).map(this::toResponse));
+        }
+
+        // Un vendedor solo puede ver los pedidos del comprador que contienen
+        // productos suyos, no el historial completo del comprador.
+        SellerEntity seller = sellerService.findByUserEntityEmail(authentication.getName())
+                .orElseThrow(() -> new application.exception.BusinessRuleException(
+                        "El perfil de vendedor no existe para: " + authentication.getName()));
+        return ResponseEntity.ok(orderService
+                .findByBuyerIdAndSellerId(buyerId, seller.getId(), pageable)
+                .map(this::toResponse));
     }
 
     @GetMapping
@@ -108,7 +125,14 @@ public class OrderController {
      */
     @PostMapping("/{id}/pay")
     @PreAuthorize("hasRole('BUYER') or hasRole('ADMINISTRATOR')")
-    public ResponseEntity<OrderResponse> payOrder(@PathVariable Long id) {
+    public ResponseEntity<OrderResponse> payOrder(@PathVariable Long id, Authentication authentication) {
+        OrderEntity order = orderService.findById(id).orElse(null);
+        if (order == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!isAdmin(authentication) && !isBuyerOwner(order, authentication)) {
+            return ResponseEntity.status(403).build();
+        }
         return ResponseEntity.ok(toResponse(orderService.processPayment(id)));
     }
 
@@ -188,8 +212,57 @@ public class OrderController {
      */
     @GetMapping("/{id}/invoice")
     @PreAuthorize("hasRole('BUYER') or hasRole('ADMINISTRATOR')")
-    public ResponseEntity<application.domain.dto.billing.InvoiceResponse> generateInvoice(@PathVariable Long id) {
+    public ResponseEntity<application.domain.dto.billing.InvoiceResponse> generateInvoice(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        OrderEntity order = orderService.findById(id).orElse(null);
+        if (order == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!isAdmin(authentication) && !isBuyerOwner(order, authentication)) {
+            return ResponseEntity.status(403).build();
+        }
         return ResponseEntity.ok(orderService.generateInvoice(id));
+    }
+
+    /**
+     * Reglas de visibilidad de un pedido:
+     * - Administrador y operador logistico: acceso operativo.
+     * - Comprador: solo sus propios pedidos.
+     * - Vendedor: solo pedidos que contienen alguno de sus productos.
+     */
+    private boolean canAccessOrder(OrderEntity order, Authentication authentication) {
+        if (isAdmin(authentication) || hasRole(authentication, "LOGISTICS_OPERATOR")) {
+            return true;
+        }
+        if (hasRole(authentication, "BUYER")) {
+            return isBuyerOwner(order, authentication);
+        }
+        if (hasRole(authentication, "SELLER")) {
+            return sellerService.findByUserEntityEmail(authentication.getName())
+                    .map(seller -> order.getItems() != null && order.getItems().stream()
+                            .anyMatch(item -> item.getProduct() != null
+                                    && item.getProduct().getSeller() != null
+                                    && seller.getId().equals(item.getProduct().getSeller().getId())))
+                    .orElse(false);
+        }
+        return false;
+    }
+
+    private boolean isBuyerOwner(OrderEntity order, Authentication authentication) {
+        return authentication != null
+                && order.getBuyer() != null
+                && authentication.getName().equals(order.getBuyer().getEmail());
+    }
+
+    private boolean isAdmin(Authentication authentication) {
+        return hasRole(authentication, "ADMINISTRATOR");
+    }
+
+    private boolean hasRole(Authentication authentication, String role) {
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_" + role));
     }
 
     private OrderResponse toResponse(OrderEntity entity) {

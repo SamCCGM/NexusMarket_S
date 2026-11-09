@@ -25,7 +25,7 @@ public class DataInitializer {
     private final PasswordEncoder passwordEncoder;
 
     @Bean
-    @Profile("dev")
+    @Profile({"dev", "local"})
     public CommandLineRunner initData(
             UserRepository userRepository,
             UserService userService,

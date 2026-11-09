@@ -101,9 +101,9 @@ public class ReportService {
 
         long lowStock = inventory.stream().filter(InventoryDocument::isLowStock).count();
         long damagedStockItems = inventory.stream()
-                .filter(i -> i.getDamagedQuantity() > 0).count();
+                .filter(i -> i.getDamagedQuantity() != null && i.getDamagedQuantity() > 0).count();
         long totalDamagedUnits = inventory.stream()
-                .mapToLong(InventoryDocument::getDamagedQuantity).sum();
+                .mapToLong(i -> i.getDamagedQuantity() == null ? 0 : i.getDamagedQuantity()).sum();
 
         return AdminReportResponse.builder()
                 .generatedAt(LocalDateTime.now())

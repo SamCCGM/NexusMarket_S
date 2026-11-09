@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -79,7 +80,8 @@ public class ProductController {
         } else {
             String email = authentication.getName();
             SellerEntity seller = sellerService.findByUserEntityEmail(email)
-                    .orElseThrow(() -> new RuntimeException("Seller profile not found"));
+                    .orElseThrow(() -> new AccessDeniedException(
+                            "El usuario autenticado no tiene perfil de vendedor: " + email));
             products = productService.findBySellerId(seller.getId());
         }
         return ResponseEntity.ok(products.stream().map(this::toResponse).collect(Collectors.toList()));
@@ -92,8 +94,12 @@ public class ProductController {
             Authentication authentication) {
         
         String email = authentication.getName();
-        SellerEntity seller = sellerService.findByUserEntityEmail(email)
-                .orElseThrow(() -> new RuntimeException("Seller profile not found"));
+        SellerEntity seller = sellerService.findByUserEntityEmail(email).orElse(null);
+        if (seller == null) {
+            // El administrador no tiene perfil de vendedor: no puede registrar
+            // productos a nombre propio. Antes esto terminaba en un error 500.
+            return ResponseEntity.status(403).build();
+        }
 
         ProductEntity product = toEntity(request, seller);
         ProductEntity saved = productService.registerProduct(product);
@@ -198,7 +204,8 @@ public class ProductController {
         }
         String email = authentication.getName();
         SellerEntity seller = sellerService.findByUserEntityEmail(email)
-                .orElseThrow(() -> new RuntimeException("Seller profile not found"));
+                .orElseThrow(() -> new AccessDeniedException(
+                        "El usuario autenticado no tiene perfil de vendedor: " + email));
         return product.getSeller() != null && product.getSeller().getId().equals(seller.getId());
     }
 
@@ -207,13 +214,77 @@ public class ProductController {
     @PreAuthorize("hasRole('SELLER') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<ProductVariantResponse> addVariant(
             @PathVariable Long productId,
-            @RequestBody @Valid ProductVariantRequest request) {
+            @RequestBody @Valid ProductVariantRequest request,
+            Authentication authentication) {
         
         return productService.findById(productId)
                 .map(product -> {
+                    // Solo el vendedor dueno del producto (o un administrador)
+                    // puede anadir variantes; antes cualquier vendedor podia
+                    // modificar el catalogo de otro.
+                    if (!isOwnerOrAdmin(product, authentication)) {
+                        return ResponseEntity.status(403).<ProductVariantResponse>build();
+                    }
                     ProductVariantEntity variant = toVariantEntity(request, product);
                     ProductVariantEntity saved = productService.saveVariant(variant);
                     return ResponseEntity.ok(toVariantResponse(saved));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/{productId}/variants/{variantId}")
+    @PreAuthorize("hasRole('SELLER') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<ProductVariantResponse> updateVariant(
+            @PathVariable Long productId,
+            @PathVariable Long variantId,
+            @RequestBody @Valid ProductVariantRequest request,
+            Authentication authentication) {
+
+        return productService.findById(productId)
+                .map(product -> {
+                    if (!isOwnerOrAdmin(product, authentication)) {
+                        return ResponseEntity.status(403).<ProductVariantResponse>build();
+                    }
+                    ProductVariantEntity updates = toVariantEntity(request, product);
+                    ProductVariantEntity updated = productService.updateVariant(
+                            productId, variantId, updates);
+                    return ResponseEntity.ok(toVariantResponse(updated));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{productId}/variants/{variantId}/deactivate")
+    @PreAuthorize("hasRole('SELLER') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<ProductVariantResponse> deactivateVariant(
+            @PathVariable Long productId,
+            @PathVariable Long variantId,
+            Authentication authentication) {
+
+        return productService.findById(productId)
+                .map(product -> {
+                    if (!isOwnerOrAdmin(product, authentication)) {
+                        return ResponseEntity.status(403).<ProductVariantResponse>build();
+                    }
+                    return ResponseEntity.ok(toVariantResponse(
+                            productService.deactivateVariant(productId, variantId)));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{productId}/variants/{variantId}/activate")
+    @PreAuthorize("hasRole('SELLER') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<ProductVariantResponse> activateVariant(
+            @PathVariable Long productId,
+            @PathVariable Long variantId,
+            Authentication authentication) {
+
+        return productService.findById(productId)
+                .map(product -> {
+                    if (!isOwnerOrAdmin(product, authentication)) {
+                        return ResponseEntity.status(403).<ProductVariantResponse>build();
+                    }
+                    return ResponseEntity.ok(toVariantResponse(
+                            productService.activateVariant(productId, variantId)));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }

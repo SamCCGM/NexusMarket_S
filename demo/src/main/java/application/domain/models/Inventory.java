@@ -95,13 +95,25 @@ public class Inventory {
         damagedQuantity += amount;
     }
 
-    /** AdjustStock (ADJUSTMENT): ajusta a la cantidad verificada. */
+    /**
+     * AdjustStock (ADJUSTMENT): ajusta a la cantidad verificada sin recortar
+     * en silencio reservas o unidades danadas, que forman parte de la realidad
+     * ya comprometida.
+     */
     public void adjustTo(int verifiedQuantity) {
         if (verifiedQuantity < 0) {
             throw new application.exception.BusinessRuleException("No se permiten existencias negativas");
         }
+        if (verifiedQuantity < reservedQuantity) {
+            throw new application.exception.BusinessRuleException(
+                    "No se puede ajustar por debajo de las unidades reservadas ("
+                            + reservedQuantity + ")");
+        }
+        if (verifiedQuantity < reservedQuantity + damagedQuantity) {
+            throw new application.exception.BusinessRuleException(
+                    "No se puede ajustar por debajo de las unidades reservadas y danadas ("
+                            + (reservedQuantity + damagedQuantity) + ")");
+        }
         quantity = verifiedQuantity;
-        reservedQuantity = Math.min(reservedQuantity, verifiedQuantity);
-        damagedQuantity = Math.min(damagedQuantity, verifiedQuantity - reservedQuantity);
     }
 }

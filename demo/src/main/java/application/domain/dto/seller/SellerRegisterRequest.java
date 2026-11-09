@@ -1,5 +1,6 @@
 package application.domain.dto.seller;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -15,7 +16,8 @@ public class SellerRegisterRequest {
     private String fullName;
 
     @NotBlank
-    @Size(min = 5, max = 150)
+    @Email
+    @Size(max = 150)
     private String email;
 
     @NotBlank
@@ -27,6 +29,9 @@ public class SellerRegisterRequest {
     @Size(min = 2, max = 150)
     private String companyName;
 
+    @Size(max = 50)
     private String taxId;
+
+    @Size(max = 1000)
     private String description;
 }

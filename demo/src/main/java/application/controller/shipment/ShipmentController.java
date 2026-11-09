@@ -3,12 +3,14 @@ package application.controller.shipment;
 import application.domain.dto.shipment.ShipmentCreateRequest;
 import application.domain.dto.shipment.ShipmentResponse;
 import application.domain.service.OrderService;
+import application.persistence.mysql.entity.OrderEntity;
 import application.persistence.mysql.entity.ShipmentEntity;
 import application.persistence.mysql.repository.ShipmentRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -47,7 +49,19 @@ public class ShipmentController {
 
     @GetMapping("/order/{orderId}")
     @PreAuthorize("hasRole('LOGISTICS_OPERATOR') or hasRole('ADMINISTRATOR') or hasRole('BUYER')")
-    public ResponseEntity<List<ShipmentResponse>> getByOrder(@PathVariable Long orderId) {
+    public ResponseEntity<List<ShipmentResponse>> getByOrder(@PathVariable Long orderId,
+                                                             Authentication authentication) {
+        // El comprador solo puede consultar los envios de sus propios pedidos.
+        if (!isAdminOrLogistics(authentication)) {
+            OrderEntity order = orderService.findById(orderId).orElse(null);
+            if (order == null) {
+                return ResponseEntity.notFound().build();
+            }
+            if (order.getBuyer() == null
+                    || !authentication.getName().equals(order.getBuyer().getEmail())) {
+                return ResponseEntity.status(403).build();
+            }
+        }
         return ResponseEntity.ok(shipmentRepository.findByOrderId(orderId).stream()
                 .map(this::toResponse).collect(Collectors.toList()));
     }
@@ -68,6 +82,12 @@ public class ShipmentController {
                 ? shipmentRepository.findByStatus(status)
                 : shipmentRepository.findAll();
         return ResponseEntity.ok(shipments.stream().map(this::toResponse).collect(Collectors.toList()));
+    }
+
+    private boolean isAdminOrLogistics(Authentication authentication) {
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRATOR")
+                        || a.getAuthority().equals("ROLE_LOGISTICS_OPERATOR"));
     }
 
     private ShipmentResponse toResponse(ShipmentEntity entity) {

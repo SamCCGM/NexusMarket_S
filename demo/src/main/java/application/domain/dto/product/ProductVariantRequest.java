@@ -31,6 +31,7 @@ public class ProductVariantRequest {
     @PositiveOrZero
     private Integer stock = 0;
 
+    @Size(max = 2000)
     private String attributes; // JSON
 
     private boolean active = true;

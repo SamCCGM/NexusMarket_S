@@ -19,6 +19,9 @@ public class BuyerService {
     @Autowired
     private BuyerRepository buyerRepository;
 
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
     /**
      * RegisterBuyer: registra un comprador. El correo y la contrasena son
      * obligatorios y el comprador inicia como comprador activo.
@@ -33,6 +36,8 @@ public class BuyerService {
         if (buyer.getPassword() == null || buyer.getPassword().isBlank()) {
             throw new BusinessRuleException("La contrasena es obligatoria para registrar un comprador");
         }
+        // La contrasena se guarda siempre cifrada (login via SecurityConfig).
+        buyer.setPassword(passwordEncoder.encode(buyer.getPassword()));
         buyer.setBuyerStatus(BuyerStatus.ACTIVE);
         if (buyer.getStatus() == null) {
             buyer.setStatus(application.domain.enums.UserStatus.ACTIVE);

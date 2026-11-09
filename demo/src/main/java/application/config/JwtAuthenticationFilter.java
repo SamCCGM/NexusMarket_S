@@ -45,7 +45,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
             
-            if (jwtService.isTokenValid(jwt, userDetails)) {
+            // Un token emitido antes del bloqueo sigue siendo criptograficamente
+            // valido, pero la cuenta ya no puede operar: se comprueba el estado
+            // vigente del usuario en cada peticion.
+            boolean accountCanAuthenticate = userDetails.isEnabled()
+                    && userDetails.isAccountNonLocked()
+                    && userDetails.isAccountNonExpired()
+                    && userDetails.isCredentialsNonExpired();
+
+            if (accountCanAuthenticate && jwtService.isAccessTokenValid(jwt, userDetails)) {
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         userDetails,
                         null,
